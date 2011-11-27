@@ -24,7 +24,7 @@ def makeExample(name, source):
     env = defaultEnvironment()
     env.ParseConfig('pkg-config allegro-5.1 allegro_primitives-5.1 allegro_image-5.1 --cflags --libs')
     env.VariantDir('build-examples', 'examples')
-    env.Append(LIBS = [allegroLibrary()])
+    env.Prepend(LIBS = [allegroLibrary(), 'm'])
     # env.Prepend(LIBS = [allegroLibrary()])
     env.Append(CPPPATH = ['allegro4'])
     return env.Program(name, map(lambda x: 'build-examples/%s' % x, source))
