@@ -7,17 +7,16 @@ def defaultEnvironment():
 
 allegro_store = [None]
 def allegroLibrary():
+    # Return the cached version
     if allegro_store[0] != None:
         return allegro_store[0]
     env = defaultEnvironment()
-    env.VariantDir('build-allegro', 'allegro4')
-    library = env.StaticLibrary(Split("""
-build-allegro/allegro.c
-build-allegro/math3d.c
-build-allegro/math.c
-build-allegro/file.c
-build-allegro/unicode.c
-"""))
+    build = 'build-allegro'
+    env.VariantDir(build, 'allegro4')
+    source = Split("""allegro.c math3d.c math.c file.c unicode.c """)
+    library = env.StaticLibrary(['%s/%s' % (build, file) for file in source])
+    # Cache the allegro library so its not built each time allegroLibrary()
+    # is called
     allegro_store[0] = library
     return allegro_store[0]
 
@@ -35,6 +34,6 @@ def stars():
 
 def shade():
     return makeExample('exshade', ['exshade.c'])
-    
+
 stars()
 shade()
