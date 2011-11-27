@@ -14,7 +14,7 @@ def allegroLibrary():
     build = 'build-allegro'
     env.VariantDir(build, 'allegro4')
     source = Split("""allegro.c math3d.c math.c file.c unicode.c """)
-    library = env.StaticLibrary(['%s/%s' % (build, file) for file in source])
+    library = env.StaticLibrary('%s/allegro4-to-5' % build, ['%s/%s' % (build, file) for file in source])
     # Cache the allegro library so its not built each time allegroLibrary()
     # is called
     allegro_store[0] = library
