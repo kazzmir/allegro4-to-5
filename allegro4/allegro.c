@@ -503,12 +503,12 @@ void polygon3d_f(BITMAP * bitmap, int type, BITMAP * texture, int vc, V3D_f * vt
     int index;
     int color = vtx[0]->c;
     for (index = 0; index < vc; index++){
-        a5_vertexes->x = vtx[index]->x;
-        a5_vertexes->y = vtx[index]->y;
-        a5_vertexes->z = vtx[index]->z;
-        a5_vertexes->u = vtx[index]->u;
-        a5_vertexes->v = vtx[index]->v;
-        a5_vertexes->color = a4color(color, current_depth);
+        a5_vertexes[index].x = vtx[index]->x;
+        a5_vertexes[index].y = vtx[index]->y;
+        a5_vertexes[index].z = vtx[index]->z;
+        a5_vertexes[index].u = vtx[index]->u;
+        a5_vertexes[index].v = vtx[index]->v;
+        a5_vertexes[index].color = a4color(color, current_depth);
     }
 
     al_set_target_bitmap(bitmap->real);
