@@ -498,7 +498,27 @@ void persp_project_f(float x, float y, float z, float *xout, float *yout){
 }
 
 void polygon3d_f(BITMAP * bitmap, int type, BITMAP * texture, int vc, V3D_f * vtx[]){
-    /* FIXME: implement with the primitives addon */
+    ALLEGRO_VERTEX * a5_vertexes = (ALLEGRO_VERTEX*) malloc(sizeof(ALLEGRO_VERTEX) * vc);
+    ALLEGRO_BITMAP * a5_texture = NULL;
+    int index;
+    int color = vtx[0]->c;
+    for (index = 0; index < vc; index++){
+        a5_vertexes->x = vtx[index]->x;
+        a5_vertexes->y = vtx[index]->y;
+        a5_vertexes->z = vtx[index]->z;
+        a5_vertexes->u = vtx[index]->u;
+        a5_vertexes->v = vtx[index]->v;
+        a5_vertexes->color = a4color(color, current_depth);
+    }
+
+    al_set_target_bitmap(bitmap->real);
+    if (texture != NULL){
+        a5_texture = texture->real;
+    }
+    /* FIXME: handle the 'type' parameter */
+    al_draw_prim(a5_vertexes, NULL, a5_texture, 0, vc, ALLEGRO_PRIM_TRIANGLE_LIST);
+
+    free(a5_vertexes);
 }
 
 /* Convert A5 times (given as a double) to a long by multiplying by 1000 */
