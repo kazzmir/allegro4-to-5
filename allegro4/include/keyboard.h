@@ -25,28 +25,19 @@
    extern "C" {
 #endif
 
-/*
+
 typedef struct KEYBOARD_DRIVER
 {
    int  id;
    AL_CONST char *name;
    AL_CONST char *desc;
    AL_CONST char *ascii_name;
-   int autorepeat;
-   AL_METHOD(int,  init, (void));
-   AL_METHOD(void, exit, (void));
-   AL_METHOD(void, poll, (void));
-   AL_METHOD(void, set_leds, (int leds));
-   AL_METHOD(void, set_rate, (int delay, int rate));
-   AL_METHOD(void, wait_for_input, (void));
-   AL_METHOD(void, stop_waiting_for_input, (void));
-   AL_METHOD(int,  scancode_to_ascii, (int scancode));
-   AL_METHOD(AL_CONST char *, scancode_to_name, (int scancode));
+   int autorepeat;   
 } KEYBOARD_DRIVER;
-*/
 
 
-// AL_VAR(KEYBOARD_DRIVER *, keyboard_driver);
+
+AL_VAR(KEYBOARD_DRIVER *, keyboard_driver);
 // AL_ARRAY(_DRIVER_INFO, _keyboard_driver_list);
 
 AL_FUNC(int, install_keyboard, (void));
@@ -76,7 +67,7 @@ AL_FUNC(void, clear_keybuf, (void));
 AL_FUNC(void, set_leds, (int leds));
 AL_FUNC(void, set_keyboard_rate, (int delay, int repeat));
 AL_FUNC(int, scancode_to_ascii, (int scancode));
-AL_FUNC(AL_CONST char *, scancode_to_name, (int scancode));
+AL_FUNC(char const *, scancode_to_name, (int scancode));
 
 /* The KEY_ macros are no longer #defined directly to avoid conflicting with
  * linux (which has its own KEY_ constants).  "__allegro_"-prefixed constants

@@ -10,12 +10,24 @@ int AL_RAND(){
 #include <allegro5/allegro5.h>
 #include <allegro5/allegro_primitives.h>
 #include <allegro5/allegro_image.h>
+#include <allegro5/allegro_font.h>
+
+#define KEYBUFFER_LENGTH 256
+
+typedef struct {int keycode, unicode;} KEYBUFFER_ENTRY;
 
 int * allegro_errno;
 int allegro_error;
 volatile char key[KEY_MAX];
+static volatile KEYBUFFER_ENTRY keybuffer[KEYBUFFER_LENGTH];
+static volatile int keybuffer_pos;
+volatile int key_shifts;
+KEYBOARD_DRIVER _keyboard_driver = {0, "A5", "A5", "A5", 0};
+KEYBOARD_DRIVER *keyboard_driver = &_keyboard_driver;
+void (*keyboard_lowlevel_callback)(int scancode);
 BITMAP * screen;
-struct FONT * font;
+static FONT _font;
+struct FONT * font = &_font;
 int * palette_color;
 ALLEGRO_DISPLAY * display;
 int mouse_x;
@@ -54,7 +66,29 @@ void poll_mouse(){
 }
 
 int keypressed(){
-    return 0;
+    return keybuffer_pos > 0;
+}
+
+int ureadkey(int *scancode){
+    while (keybuffer_pos == 0)
+        al_rest(0.1);
+    keybuffer_pos--;
+    if (scancode) *scancode = keybuffer[keybuffer_pos].keycode;
+    return keybuffer[keybuffer_pos].unicode;
+}
+
+int readkey(){
+    int scancode;
+    int c = ureadkey(&scancode);
+    return (c & 255) + (scancode << 8);
+}
+
+void clear_keybuf(){
+    keybuffer_pos = 0;
+}
+
+void rest(int milliseconds){
+    al_rest(milliseconds / 1000.0);
 }
 
 void vsync(){
@@ -85,7 +119,8 @@ BITMAP * load_bitmap(const char * path,struct RGB *pal){
 }
 
 void destroy_bitmap(BITMAP* bitmap){
-    al_destroy_bitmap((ALLEGRO_BITMAP*) bitmap);
+    al_destroy_bitmap(bitmap->real);
+    free(bitmap);
 }
 
 int poll_keyboard(){
@@ -120,7 +155,11 @@ void clear_bitmap(BITMAP * bitmap){
     al_clear_to_color(al_map_rgb(0, 0, 0));
 }
 
-void allegro_message(){
+void allegro_message(char const *format, ...){
+    va_list args;
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
 }
 
 BITMAP * create_bitmap(int width, int height){
@@ -149,17 +188,44 @@ static int a4key(int a5key){
     }
 }
 
+static int a5key(int a4key){
+    switch (a4key){
+        case KEY_LCONTROL: return ALLEGRO_KEY_LCTRL;
+        case KEY_RCONTROL: return ALLEGRO_KEY_RCTRL;
+        default: return a4key;
+    }
+}
+
+char const *scancode_to_name(int scancode){
+    return al_keycode_to_name(a5key(scancode));
+}
+
 static void * read_keys(ALLEGRO_THREAD * self, void * arg){
     ALLEGRO_EVENT_QUEUE * queue = al_create_event_queue();
     al_register_event_source(queue, al_get_keyboard_event_source());
     while (true){
         ALLEGRO_EVENT event;
         al_wait_for_event(queue, &event);
-
         if (event.type == ALLEGRO_EVENT_KEY_DOWN){
-            key[a4key(event.keyboard.keycode)] = 1;
+            int k = a4key(event.keyboard.keycode);
+            key[k] = 1;
+            if (keyboard_lowlevel_callback) {
+                al_set_target_backbuffer(display);
+                keyboard_lowlevel_callback(k);
+            }
         } else if (event.type == ALLEGRO_EVENT_KEY_UP){
-            key[a4key(event.keyboard.keycode)] = 0;
+            int k = a4key(event.keyboard.keycode);
+            key[k] = 0;
+            if (keyboard_lowlevel_callback) {
+                al_set_target_backbuffer(display);
+                keyboard_lowlevel_callback(k + 128);
+            }
+        } else if (event.type == ALLEGRO_EVENT_KEY_CHAR){
+            if (keybuffer_pos < KEYBUFFER_LENGTH) {
+                keybuffer[keybuffer_pos].unicode = event.keyboard.unichar;
+                keybuffer[keybuffer_pos].keycode = event.keyboard.keycode;
+                keybuffer_pos++;
+            }
         }
     }
 }
@@ -174,19 +240,28 @@ static void start_key_thread(){
 }
 
 int allegro_init(){
+    ALLEGRO_PATH *path;
     allegro_errno = &allegro_error;
     int ok = al_init();
     al_init_primitives_addon();
     al_init_image_addon();
+    al_init_font_addon();
     al_install_keyboard();
     al_set_new_bitmap_flags(ALLEGRO_MEMORY_BITMAP);
     start_key_thread();
+    
+    path = al_get_standard_path(ALLEGRO_RESOURCES_PATH);
+    al_append_path_component(path, "examples/");
+    al_set_path_filename(path, "a4_font.tga");
+    font->real = al_load_font(al_path_cstr(path, '/'), 0, 0);
+    al_destroy_path(path);
+
     return is_ok(ok);
 }
 
 void rectfill(BITMAP * buffer, int x1, int y1, int x2, int y2, int color){
     al_set_target_bitmap(buffer->real);
-    al_draw_filled_rectangle(x1, y1, x2, y2, a4color(color));
+    al_draw_filled_rectangle(x1, y1, x2+1, y2+1, a4color(color));
 }
 
 void triangle(BITMAP * buffer, int x1, int y1, int x2, int y2, int x3, int y3, int color){
@@ -204,32 +279,82 @@ void set_palette(const PALETTE palette){
     memcpy(current_palette, palette, sizeof(PALETTE));
 }
 
-void blit(BITMAP * from, BITMAP * to, int to_x, int to_y, int from_x, int from_y, int width, int height){
+void blit(BITMAP * from, BITMAP * to, int from_x, int from_y, int to_x, int to_y, int width, int height){
     ALLEGRO_BITMAP * al_from = from->real;
     ALLEGRO_BITMAP * al_to = to->real;
-    al_set_target_bitmap(al_to);
-    al_draw_bitmap(al_from, to_x, to_y, 0);
+    /* A4 allows drawing a bitmap to itself, A5 does not. */
+    if (al_from == al_to) {
+        ALLEGRO_BITMAP *temp = al_create_bitmap(width, height);
+        al_set_target_bitmap(temp);
+        al_draw_bitmap(al_from, -from_x, -from_y, 0);
+        al_set_target_bitmap(al_to);
+        al_draw_bitmap(temp, to_x, to_y, 0);
+        al_destroy_bitmap(temp);
+    }
+    else {
+        al_set_target_bitmap(al_to);
+        al_draw_bitmap(al_from, to_x, to_y, 0);
+    }
     if (to == screen){
         al_flip_display();
     }
 }
 
 void textprintf_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
+    char buffer[65536];
+    va_list args;
+    va_start(args, format);
+    vsprintf(buffer, format, args);
+    va_end(args);
+    textout_ex(bmp, f, buffer, x, y, color, bg);
 }
 
 void textout_centre_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, AL_CONST char *str, int x, int y, int color, int bg){
-    // printf("%s\n", str);
+    al_set_target_bitmap(bmp->real);
+    if (bg != -1) {
+        int w = al_get_text_width(f->real, str);
+        al_draw_filled_rectangle(x - w / 2, y, x + w - w / 2,
+            y + al_get_font_line_height(f->real), a4color(bg));
+    }
+    al_draw_text(f->real, a4color(color), x, y, ALLEGRO_ALIGN_CENTRE, str);
 }
 
 void textprintf_centre_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
+    char buffer[65536];
+    va_list args;
+    va_start(args, format);
+    vsprintf(buffer, format, args);
+    va_end(args);
+    textout_centre_ex(bmp, f, buffer, x, y, color, bg);
 }
 
 void textout_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, AL_CONST char *str, int x, int y, int color, int bg){
+    al_set_target_bitmap(bmp->real);
+    if (bg != -1) {
+        al_draw_filled_rectangle(x, y, x + al_get_text_width(f->real, str),
+            y + al_get_font_line_height(f->real), a4color(bg));
+    }
+    al_draw_text(f->real, a4color(color), x, y, 0, str);
 }
 
 void draw_gouraud_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y, int c1, int c2, int c3, int c4){
     al_set_target_bitmap(bmp->real);
     al_draw_bitmap(sprite->real, x, y, 0);
+}
+
+int makecol(int r, int g, int b){
+    return bestfit_color(current_palette, r>>2, g>>2, b>>2);
+}
+
+void clear_to_color(BITMAP *bitmap, int color){
+    al_set_target_bitmap(bitmap->real);
+    al_clear_to_color(a4color(color));
+}
+
+void acquire_screen(){
+}
+
+void release_screen(){
 }
 
 fixed fixmul(fixed x, fixed y){

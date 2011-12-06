@@ -13,7 +13,7 @@ def allegroLibrary():
     env = defaultEnvironment()
     build = 'build-allegro'
     env.VariantDir(build, 'allegro4')
-    source = Split("""allegro.c math3d.c math.c file.c unicode.c """)
+    source = Split("""allegro.c math3d.c math.c file.c unicode.c color.c """)
     library = env.StaticLibrary('%s/allegro4-to-5' % build, ['%s/%s' % (build, file) for file in source])
     # Cache the allegro library so its not built each time allegroLibrary()
     # is called
@@ -22,7 +22,7 @@ def allegroLibrary():
 
 def makeExample(name, source):
     env = defaultEnvironment()
-    env.ParseConfig('pkg-config allegro-5.1 allegro_primitives-5.1 allegro_image-5.1 --cflags --libs')
+    env.ParseConfig('pkg-config allegro-5.1 allegro_primitives-5.1 allegro_image-5.1 allegro_font-5.1 --cflags --libs')
     env.VariantDir('build-examples', 'examples')
     env.Prepend(LIBS = [allegroLibrary(), 'm'])
     # env.Prepend(LIBS = [allegroLibrary()])
@@ -35,5 +35,13 @@ def stars():
 def shade():
     return makeExample('exshade', ['exshade.c'])
 
+def bitmap():
+    return makeExample('exbitmap', ['exbitmap.c'])
+
+def keys():
+    return makeExample('exkeys', ['exkeys.c'])
+
 stars()
 shade()
+bitmap()
+keys()
