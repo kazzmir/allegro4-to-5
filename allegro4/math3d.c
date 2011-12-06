@@ -904,3 +904,11 @@ void set_projection_viewport(int x, int y, int w, int h)
    _persp_yoffset_f = y + h/2;
 }
 
+void apply_matrix_f(AL_CONST MATRIX_f *m, float x, float y, float z,
+                    float *xout, float *yout, float *zout){
+#define CALC_ROW(n) (x * m->v[(n)][0] + y * m->v[(n)][1] + z * m->v[(n)][2] + m->t[(n)])
+    *xout = CALC_ROW(0);
+    *yout = CALC_ROW(1);
+    *zout = CALC_ROW(2);
+#undef CALC_ROW
+}

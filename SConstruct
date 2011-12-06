@@ -2,7 +2,7 @@ import os
 
 def defaultEnvironment():
     env = Environment(ENV = os.environ)
-    env.Append(CCFLAGS = ['-g3'])
+    env.Append(CCFLAGS = ['-g3', '-Wall'])
     return env
 
 allegro_store = [None]
@@ -13,7 +13,7 @@ def allegroLibrary():
     env = defaultEnvironment()
     build = 'build-allegro'
     env.VariantDir(build, 'allegro4')
-    source = Split("""allegro.c math3d.c math.c file.c unicode.c color.c """)
+    source = Split("""allegro.c math3d.c math.c file.c unicode.c color.c clip3df.c""")
     library = env.StaticLibrary('%s/allegro4-to-5' % build, ['%s/%s' % (build, file) for file in source])
     # Cache the allegro library so its not built each time allegroLibrary()
     # is called
@@ -41,7 +41,11 @@ def bitmap():
 def keys():
     return makeExample('exkeys', ['exkeys.c'])
 
+def camera():
+    return makeExample('excamera', ['excamera.c'])
+
 stars()
 shade()
 bitmap()
 keys()
+camera()

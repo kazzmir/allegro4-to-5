@@ -33,6 +33,7 @@ ALLEGRO_DISPLAY * display;
 int mouse_x;
 int mouse_y;
 GFX_DRIVER * gfx_driver;
+static int current_depth = 8;
 
 PALETTE current_palette;
 
@@ -57,9 +58,34 @@ static int is_ok(int code){
     return -1;
 }
 
-static ALLEGRO_COLOR a4color(int color){
-    RGB * rgb = &current_palette[color];
-    return al_map_rgb(rgb->r * 4, rgb->g * 4, rgb->b * 4);
+static ALLEGRO_COLOR a4color(int color, int bit_depth){
+    if (bit_depth == 8){
+        RGB * rgb = &current_palette[color];
+        return al_map_rgb(rgb->r * 4, rgb->g * 4, rgb->b * 4);
+    }
+    /* FIXME: handle other depths */
+    return al_map_rgb(1, 1, 1);
+}
+
+int getr_depth(int color_depth, int c){
+    ALLEGRO_COLOR color = a4color(c, color_depth);
+    unsigned char red, green, blue;
+    al_unmap_rgb(color, &red, &green, &blue);
+    return red;
+}
+
+int getg_depth(int color_depth, int c){
+    ALLEGRO_COLOR color = a4color(c, color_depth);
+    unsigned char red, green, blue;
+    al_unmap_rgb(color, &red, &green, &blue);
+    return green;
+}
+
+int getb_depth(int color_depth, int c){
+    ALLEGRO_COLOR color = a4color(c, color_depth);
+    unsigned char red, green, blue;
+    al_unmap_rgb(color, &red, &green, &blue);
+    return blue;
 }
 
 void poll_mouse(){
@@ -124,6 +150,7 @@ void destroy_bitmap(BITMAP* bitmap){
 }
 
 int poll_keyboard(){
+    return 0;
 }
 
 static void setup_default_driver(BITMAP * screen){
@@ -178,6 +205,7 @@ void install_mouse(){
 }
 
 int install_keyboard(){
+    return 0;
 }
 
 static int a4key(int a5key){
@@ -228,6 +256,8 @@ static void * read_keys(ALLEGRO_THREAD * self, void * arg){
             }
         }
     }
+
+    return NULL;
 }
 
 static void start_key_thread(){
@@ -259,20 +289,25 @@ int allegro_init(){
     return is_ok(ok);
 }
 
+void rect(BITMAP * buffer, int x1, int y1, int x2, int y2, int color){
+    al_set_target_bitmap(buffer->real);
+    al_draw_rectangle(x1, y1, x2+1, y2+1, a4color(color, current_depth), 1);
+}
+
 void rectfill(BITMAP * buffer, int x1, int y1, int x2, int y2, int color){
     al_set_target_bitmap(buffer->real);
-    al_draw_filled_rectangle(x1, y1, x2+1, y2+1, a4color(color));
+    al_draw_filled_rectangle(x1, y1, x2+1, y2+1, a4color(color, current_depth));
 }
 
 void triangle(BITMAP * buffer, int x1, int y1, int x2, int y2, int x3, int y3, int color){
     al_set_target_bitmap(buffer->real);
-    al_draw_filled_triangle(x1, y1, x2, y2, x3, y3, a4color(color));
+    al_draw_filled_triangle(x1, y1, x2, y2, x3, y3, a4color(color, current_depth));
 }
 
 void putpixel(BITMAP * buffer, int x, int y, int color){
     ALLEGRO_BITMAP * al_buffer = buffer->real;
     al_set_target_bitmap(al_buffer);
-    al_put_pixel(x, y, a4color(color));
+    al_put_pixel(x, y, a4color(color, current_depth));
 }
 
 void set_palette(const PALETTE palette){
@@ -314,9 +349,9 @@ void textout_centre_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, AL_CONST cha
     if (bg != -1) {
         int w = al_get_text_width(f->real, str);
         al_draw_filled_rectangle(x - w / 2, y, x + w - w / 2,
-            y + al_get_font_line_height(f->real), a4color(bg));
+            y + al_get_font_line_height(f->real), a4color(bg, current_depth));
     }
-    al_draw_text(f->real, a4color(color), x, y, ALLEGRO_ALIGN_CENTRE, str);
+    al_draw_text(f->real, a4color(color, current_depth), x, y, ALLEGRO_ALIGN_CENTRE, str);
 }
 
 void textprintf_centre_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
@@ -332,9 +367,9 @@ void textout_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, AL_CONST char *str,
     al_set_target_bitmap(bmp->real);
     if (bg != -1) {
         al_draw_filled_rectangle(x, y, x + al_get_text_width(f->real, str),
-            y + al_get_font_line_height(f->real), a4color(bg));
+            y + al_get_font_line_height(f->real), a4color(bg, current_depth));
     }
-    al_draw_text(f->real, a4color(color), x, y, 0, str);
+    al_draw_text(f->real, a4color(color, current_depth), x, y, 0, str);
 }
 
 void draw_gouraud_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y, int c1, int c2, int c3, int c4){
@@ -342,13 +377,31 @@ void draw_gouraud_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y
     al_draw_bitmap(sprite->real, x, y, 0);
 }
 
+int makecol_depth(int depth, int r, int g, int b){
+    switch (depth){
+        case 8: return bestfit_color(current_palette, r>>2, g>>2, b>>2);
+        /* FIXME: handle 15, 16, 24, 32 */
+        default: return 0;
+    }
+}
+
+void set_clip_rect(BITMAP * bitmap, int x1, int y1, int x2, int y2){
+    al_set_target_bitmap(bitmap->real);
+    al_set_clipping_rectangle(x1, y1, x2 - x1, y2 - y1);
+}
+
+int bitmap_color_depth(BITMAP * bitmap){
+    /* FIXME: return the depth of the bitmap */
+    return current_depth;
+}
+
 int makecol(int r, int g, int b){
-    return bestfit_color(current_palette, r>>2, g>>2, b>>2);
+    return makecol_depth(current_depth, r, g, b);
 }
 
 void clear_to_color(BITMAP *bitmap, int color){
     al_set_target_bitmap(bitmap->real);
-    al_clear_to_color(a4color(color));
+    al_clear_to_color(a4color(color, current_depth));
 }
 
 void acquire_screen(){
@@ -444,4 +497,52 @@ void persp_project_f(float x, float y, float z, float *xout, float *yout){
    *yout = ((y * z1) * _persp_yscale_f) + _persp_yoffset_f;
 }
 
+void polygon3d_f(BITMAP * bitmap, int type, BITMAP * texture, int vc, V3D_f * vtx[]){
+    /* FIXME: implement with the primitives addon */
+}
+
+/* Convert A5 times (given as a double) to a long by multiplying by 1000 */
+#define TIMERS_PER_SECOND     1193181L
+long BPS_TO_TIMER(long time){
+    return ALLEGRO_BPS_TO_SECS(time) * 1000;
+}
+
+struct timer_stuff{
+    long speed;
+    void (*callback)();
+};
+
+static void * start_timer(ALLEGRO_THREAD * self, void * arg){
+    struct timer_stuff * stuff = (struct timer_stuff*) arg;
+    ALLEGRO_TIMER * timer;
+    double speed = stuff->speed / 1000.0;
+    ALLEGRO_EVENT_QUEUE * queue = al_create_event_queue();
+
+    timer = al_create_timer(speed);
+    al_start_timer(timer);
+    al_register_event_source(queue, al_get_timer_event_source(timer));
+
+    while (true){
+        ALLEGRO_EVENT event;
+        al_wait_for_event(queue, &event);
+        if (event.type == ALLEGRO_EVENT_TIMER){
+            stuff->callback();
+        }
+    }
+
+    free(stuff);
+    return NULL;
+}
+
+int install_int_ex(void (*proc)(void), long speed){
+    struct timer_stuff * timer = malloc(sizeof(struct timer_stuff));
+    timer->speed = speed;
+    timer->callback = proc;
+    ALLEGRO_THREAD * thread = al_create_thread(start_timer, timer);
+    if (thread != NULL){
+        al_start_thread(thread);
+        return 0;
+    }
+    return -1;
+}
 
