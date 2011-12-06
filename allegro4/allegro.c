@@ -516,7 +516,7 @@ void polygon3d_f(BITMAP * bitmap, int type, BITMAP * texture, int vc, V3D_f * vt
         a5_texture = texture->real;
     }
     /* FIXME: handle the 'type' parameter */
-    al_draw_prim(a5_vertexes, NULL, a5_texture, 0, vc, ALLEGRO_PRIM_TRIANGLE_LIST);
+    al_draw_prim(a5_vertexes, NULL, a5_texture, 0, vc, ALLEGRO_PRIM_TRIANGLE_FAN);
 
     free(a5_vertexes);
 }
