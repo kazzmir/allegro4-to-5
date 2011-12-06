@@ -39,6 +39,7 @@ typedef struct FONT
    void *data;
    int height;
    struct FONT_VTABLE *vtable;
+   struct ALLEGRO_FONT *real;
 } FONT;
 
 AL_FUNC(int, font_has_alpha, (FONT *f));
