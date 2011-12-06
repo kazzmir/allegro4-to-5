@@ -14,7 +14,7 @@ int AL_RAND(){
 
 #define KEYBUFFER_LENGTH 256
 
-typedef struct {int keycode, unicode;} KEYBUFFER_ENTRY;
+typedef struct {int keycode, unicode, modifiers;} KEYBUFFER_ENTRY;
 
 int * allegro_errno;
 int allegro_error;
@@ -228,6 +228,11 @@ char const *scancode_to_name(int scancode){
     return al_keycode_to_name(a5key(scancode));
 }
 
+static int is_shift(int key){
+    return key == ALLEGRO_KEY_LSHIFT ||
+           key == ALLEGRO_KEY_RSHIFT;
+}
+
 static void * read_keys(ALLEGRO_THREAD * self, void * arg){
     ALLEGRO_EVENT_QUEUE * queue = al_create_event_queue();
     al_register_event_source(queue, al_get_keyboard_event_source());
@@ -237,6 +242,10 @@ static void * read_keys(ALLEGRO_THREAD * self, void * arg){
         if (event.type == ALLEGRO_EVENT_KEY_DOWN){
             int k = a4key(event.keyboard.keycode);
             key[k] = 1;
+            if (is_shift(event.keyboard.keycode)){
+                key_shifts |= KB_SHIFT_FLAG;
+            }
+
             if (keyboard_lowlevel_callback) {
                 al_set_target_backbuffer(display);
                 keyboard_lowlevel_callback(k);
@@ -244,6 +253,9 @@ static void * read_keys(ALLEGRO_THREAD * self, void * arg){
         } else if (event.type == ALLEGRO_EVENT_KEY_UP){
             int k = a4key(event.keyboard.keycode);
             key[k] = 0;
+            if (is_shift(event.keyboard.keycode)){
+                key_shifts &= ~KB_SHIFT_FLAG;
+            }
             if (keyboard_lowlevel_callback) {
                 al_set_target_backbuffer(display);
                 keyboard_lowlevel_callback(k + 128);
@@ -252,6 +264,7 @@ static void * read_keys(ALLEGRO_THREAD * self, void * arg){
             if (keybuffer_pos < KEYBUFFER_LENGTH) {
                 keybuffer[keybuffer_pos].unicode = event.keyboard.unichar;
                 keybuffer[keybuffer_pos].keycode = event.keyboard.keycode;
+                keybuffer[keybuffer_pos].modifiers = (is_shift(event.keyboard.keycode) ? KB_SHIFT_FLAG : 0);
                 keybuffer_pos++;
             }
         }
