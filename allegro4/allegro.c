@@ -100,6 +100,8 @@ int ureadkey(int *scancode){
         al_rest(0.1);
     keybuffer_pos--;
     if (scancode) *scancode = keybuffer[keybuffer_pos].keycode;
+    /* FIXME: not sure if the key_shifts should be updated here */
+    key_shifts = keybuffer[keybuffer_pos].modifiers;
     return keybuffer[keybuffer_pos].unicode;
 }
 
@@ -270,7 +272,8 @@ static void * read_keys(ALLEGRO_THREAD * self, void * arg){
             if (keybuffer_pos < KEYBUFFER_LENGTH) {
                 keybuffer[keybuffer_pos].unicode = event.keyboard.unichar;
                 keybuffer[keybuffer_pos].keycode = event.keyboard.keycode;
-                keybuffer[keybuffer_pos].modifiers = (is_shift(event.keyboard.keycode) ? KB_SHIFT_FLAG : 0);
+                /* FIXME: handle the rest of the modifiers */
+                keybuffer[keybuffer_pos].modifiers = (event.keyboard.modifiers & ALLEGRO_KEYMOD_SHIFT) ? KB_SHIFT_FLAG : 0;
                 keybuffer_pos++;
             }
         }
@@ -333,6 +336,12 @@ void set_palette(const PALETTE palette){
     memcpy(current_palette, palette, sizeof(PALETTE));
 }
 
+static void maybe_flip_screen(BITMAP * where){
+    if (where == screen){
+        al_flip_display();
+    }
+}
+
 void blit(BITMAP * from, BITMAP * to, int from_x, int from_y, int to_x, int to_y, int width, int height){
     ALLEGRO_BITMAP * al_from = from->real;
     ALLEGRO_BITMAP * al_to = to->real;
@@ -349,9 +358,8 @@ void blit(BITMAP * from, BITMAP * to, int from_x, int from_y, int to_x, int to_y
         al_set_target_bitmap(al_to);
         al_draw_bitmap(al_from, to_x, to_y, 0);
     }
-    if (to == screen){
-        al_flip_display();
-    }
+
+    maybe_flip_screen(to);
 }
 
 void textprintf_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
@@ -389,6 +397,8 @@ void textout_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, AL_CONST char *str,
             y + al_get_font_line_height(f->real), a4color(bg, current_depth));
     }
     al_draw_text(f->real, a4color(color, current_depth), x, y, 0, str);
+
+    maybe_flip_screen(bmp);
 }
 
 void draw_gouraud_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y, int c1, int c2, int c3, int c4){
