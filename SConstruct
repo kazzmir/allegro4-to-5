@@ -47,9 +47,13 @@ def camera():
 def mouse():
     return makeExample('exmouse', ['exmouse.c'])
 
+def config():
+    return makeExample('exconfig', ['exconfig.c'])
+
 stars()
 shade()
 bitmap()
 keys()
 camera()
 mouse()
+config()

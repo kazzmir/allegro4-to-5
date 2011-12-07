@@ -20,6 +20,7 @@
 #include "include/font.h"
 #include "include/midi.h"
 #include "include/sound.h"
+#include "include/config.h"
 
 #ifdef __cplusplus
    extern "C" {

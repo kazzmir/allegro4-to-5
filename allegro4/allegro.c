@@ -43,6 +43,9 @@ static int current_depth = 8;
 static ALLEGRO_MOUSE_CURSOR *cursor;
 static ALLEGRO_BITMAP *cursor_bitmap;
 static int cursor_x, cursor_y;
+static ALLEGRO_CONFIG *current_config;
+static ALLEGRO_CONFIG **config_stack;
+static int config_stack_size;
 
 PALETTE current_palette;
 
@@ -344,6 +347,7 @@ int allegro_init(){
     ALLEGRO_PATH *path;
     allegro_errno = &allegro_error;
     int ok = al_init();
+    current_config = al_create_config();
     al_init_primitives_addon();
     al_init_image_addon();
     al_init_font_addon();
@@ -401,23 +405,31 @@ static void maybe_flip_screen(BITMAP * where){
     }
 }
 
-void blit(BITMAP * from, BITMAP * to, int from_x, int from_y, int to_x, int to_y, int width, int height){
-    ALLEGRO_BITMAP * al_from = from->real;
-    ALLEGRO_BITMAP * al_to = to->real;
-    /* A4 allows drawing a bitmap to itself, A5 does not. */
-    if (al_from == al_to) {
-        ALLEGRO_BITMAP *temp = al_create_bitmap(width, height);
-        al_set_target_bitmap(temp);
-        al_draw_bitmap(al_from, -from_x, -from_y, 0);
-        al_set_target_bitmap(al_to);
-        al_draw_bitmap(temp, to_x, to_y, 0);
-        al_destroy_bitmap(temp);
-    } else {
-        al_set_target_bitmap(al_to);
-        al_draw_bitmap(al_from, to_x, to_y, 0);
-    }
+void stretch_blit(BITMAP *source, BITMAP *dest, int source_x,
+    int source_y, int source_width, int source_height, int dest_x,
+    int dest_y, int dest_width, int dest_height){
+    ALLEGRO_BITMAP * al_from = source->real;
+    ALLEGRO_BITMAP * al_to = dest->real;
+     /* A4 allows drawing a bitmap to itself, A5 does not. */
+     if (al_from == al_to) {
+        ALLEGRO_BITMAP *temp = al_create_bitmap(source_width, source_height);
+         al_set_target_bitmap(temp);
+        al_draw_bitmap(al_from, -source_x, -source_y, 0);
+         al_set_target_bitmap(al_to);
+        al_draw_scaled_bitmap(temp, 0, 0, source_width,
+            source_height, dest_x, dest_y, dest_width, dest_height, 0);
+         al_destroy_bitmap(temp);
+     } else {
+         al_set_target_bitmap(al_to);
+        al_draw_scaled_bitmap(al_from, source_x, source_y, source_width,
+            source_height, dest_x, dest_y, dest_width, dest_height, 0);
+     }
+ 
+    maybe_flip_screen(dest);
+}
 
-    maybe_flip_screen(to);
+void blit(BITMAP * from, BITMAP * to, int from_x, int from_y, int to_x, int to_y, int width, int height){
+    stretch_blit(from, to, from_x, from_y, width, height, to_x, to_y, width, height);
 }
 
 void textprintf_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
@@ -685,3 +697,61 @@ int install_int_ex(void (*proc)(void), long speed){
     return -1;
 }
 
+void push_config_state(){
+    config_stack_size++;
+    config_stack = al_realloc(config_stack, config_stack_size * sizeof *config_stack);
+    config_stack[config_stack_size - 1] = current_config;
+    current_config = al_create_config();
+}
+
+void pop_config_state(){
+    if (current_config) al_destroy_config(current_config);
+    current_config = config_stack[config_stack_size - 1];
+    config_stack_size--;
+    config_stack = al_realloc(config_stack, config_stack_size * sizeof *config_stack);
+}
+
+void set_config_file(char const *filename){
+    if (current_config) al_destroy_config(current_config);
+    current_config = al_load_config_file(filename);
+    if (!current_config) current_config = al_create_config();
+}
+
+static char _tokens[64][64];
+static char *tokens[64];
+char **get_config_argv(char const *section, char const *name, int *argc){
+    char const *v;
+    int i, pos = 0;
+    v = al_get_config_value(current_config, section, name);
+    *argc = 0;
+    _tokens[0][0] = 0;
+    tokens[0] = _tokens[0];
+    if (!v) return tokens;
+    while (*argc < 64) {
+        for (i = 0; i < 63; i++) {
+            char c = v[pos];
+            if (!c) break;
+            pos++;
+            if (c == ' ') break;
+            _tokens[*argc][i] = c;
+        }
+        _tokens[*argc][i] = 0;
+        tokens[*argc] = _tokens[*argc];
+        (*argc)++;
+        if (!v[pos]) break;
+    }
+    
+    return tokens;
+}
+
+char const *get_config_string(char const *section, char const *name, char const *def){
+    char const *v = al_get_config_value(current_config, section, name);
+    if (!v) return def;
+    return v;
+}
+
+int get_config_int(char const *section, char const *name, int def){
+    char const *v = al_get_config_value(current_config, section, name);
+    if (!v) return def;
+    return strtol(v, NULL, 10);
+}
