@@ -299,7 +299,7 @@ int allegro_init(){
     al_init_image_addon();
     al_init_font_addon();
     al_install_keyboard();
-    al_set_new_bitmap_flags(ALLEGRO_MEMORY_BITMAP);
+    // al_set_new_bitmap_flags(ALLEGRO_MEMORY_BITMAP);
     start_key_thread();
     
     path = al_get_standard_path(ALLEGRO_RESOURCES_PATH);
@@ -353,8 +353,7 @@ void blit(BITMAP * from, BITMAP * to, int from_x, int from_y, int to_x, int to_y
         al_set_target_bitmap(al_to);
         al_draw_bitmap(temp, to_x, to_y, 0);
         al_destroy_bitmap(temp);
-    }
-    else {
+    } else {
         al_set_target_bitmap(al_to);
         al_draw_bitmap(al_from, to_x, to_y, 0);
     }
@@ -537,13 +536,26 @@ void polygon3d_f(BITMAP * bitmap, int type, BITMAP * texture, int vc, V3D_f * vt
         a5_vertexes[index].z = vtx[index]->z;
         a5_vertexes[index].u = vtx[index]->u;
         a5_vertexes[index].v = vtx[index]->v;
-        a5_vertexes[index].color = a4color(color, current_depth);
+        // a5_vertexes[index].color = a4color(color, current_depth);
+        a5_vertexes[index].color = al_map_rgb(255, 255, 255);
+        
+        /*
+        printf("%d: x %f y %f z %f u %f v %f\n",
+               index,
+               vtx[index]->x,
+               vtx[index]->y,
+               vtx[index]->z,
+               vtx[index]->u,
+               vtx[index]->v);
+               */
     }
 
     al_set_target_bitmap(bitmap->real);
     if (texture != NULL){
         a5_texture = texture->real;
     }
+
+    al_draw_circle(vtx[0]->x, vtx[0]->y, 4, al_map_rgb(255, 255, 255), 3);
     /* FIXME: handle the 'type' parameter */
     al_draw_prim(a5_vertexes, NULL, a5_texture, 0, vc, ALLEGRO_PRIM_TRIANGLE_FAN);
 
