@@ -63,7 +63,7 @@ char *replace_filename(char *dest, AL_CONST char *path, AL_CONST char *filename,
 
 
 
-
+#if 0
 // #include "allegro/internal/aintern.h"
 
 #ifndef ALLEGRO_MPW
@@ -3004,3 +3004,4 @@ static int normal_flush_buffer(PACKFILE *f, int last)
    return EOF;
 }
 
+#endif
