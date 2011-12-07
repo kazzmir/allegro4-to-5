@@ -19,7 +19,7 @@ def allegroLibrary():
     if allegro_store[0] != None:
         return allegro_store[0]
     env = defaultEnvironment()
-    library = SConscript('allegro4/SConscript', variant_dir = 'build-allegro', exports = ['env'])
+    library = SConscript('allegro4/SConscript', variant_dir = 'build/allegro', exports = ['env'])
     #build = 'build-allegro'
     #env.VariantDir(build, 'allegro4')
     #source = Split("""allegro.c math3d.c math.c file.c unicode.c color.c clip3df.c""")
@@ -31,8 +31,8 @@ def allegroLibrary():
 
 def makeExample(name, source):
     env = allegro4Environment()
-    env.VariantDir('build-examples', 'examples')
-    return env.Program(name, map(lambda x: 'build-examples/%s' % x, source))
+    env.VariantDir('build/examples', 'examples')
+    return env.Program(name, map(lambda x: 'build/examples/%s' % x, source))
 
 def stars():
     return makeExample('exstars', ['exstars.c'])
@@ -58,6 +58,10 @@ def config():
 def data():
     return makeExample('exdata', ['exdata.c'])
 
+def demos():
+    env = allegro4Environment()
+    SConscript('demos/SConscript', variant_dir = 'build/demos', exports = ['env'])
+
 stars()
 shade()
 bitmap()
@@ -66,3 +70,4 @@ camera()
 mouse()
 config()
 #data()
+demos()
