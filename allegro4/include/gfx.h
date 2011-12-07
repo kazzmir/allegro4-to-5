@@ -428,6 +428,8 @@ AL_FUNC(void, set_clip_rect, (BITMAP *bitmap, int x1, int y_1, int x2, int y2));
 AL_FUNC(void, add_clip_rect, (BITMAP *bitmap, int x1, int y_1, int x2, int y2));
 AL_FUNC(void, clear_bitmap, (BITMAP *bitmap));
 AL_FUNC(void, vsync, (void));
+int bitmap_color_depth(BITMAP * bitmap);
+void blit(BITMAP * from, BITMAP * to, int from_x, int from_y, int to_x, int to_y, int width, int height);
 
 
 /* Bitfield for relaying graphics driver type information */

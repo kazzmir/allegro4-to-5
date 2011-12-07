@@ -2,11 +2,13 @@
 #define ALLEGRO_H
 
 #include "include/gfx.h"
+#include "include/draw.h"
 #include "include/fix.h"
 #include "include/matrix.h"
 #include "include/palette.h"
 #include "include/text.h"
 #include "include/keyboard.h"
+#include "include/mouse.h"
 #include "include/3dmaths.h"
 #include "include/3d.h"
 #include "include/color.h"
@@ -25,11 +27,12 @@
 
 // typedef struct BITMAP BITMAP;
 extern int * palette_color;
-extern int mouse_x;
-extern int mouse_y;
 extern BITMAP* screen;
 
 extern int allegro_error;
+
+int allegro_init();
+void allegro_message(char const *format, ...);
 
 #define END_OF_MAIN()
 

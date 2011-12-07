@@ -24,16 +24,25 @@ static volatile int keybuffer_pos;
 volatile int key_shifts;
 KEYBOARD_DRIVER _keyboard_driver = {0, "A5", "A5", "A5", 0};
 KEYBOARD_DRIVER *keyboard_driver = &_keyboard_driver;
+MOUSE_DRIVER _mouse_driver = {0, "A5", "A5", "A5"};
+MOUSE_DRIVER *mouse_driver = &_mouse_driver;
 void (*keyboard_lowlevel_callback)(int scancode);
 BITMAP * screen;
 static FONT _font;
 struct FONT * font = &_font;
 int * palette_color;
 ALLEGRO_DISPLAY * display;
-int mouse_x;
-int mouse_y;
+volatile int mouse_w;
+volatile int mouse_x;
+volatile int mouse_y;
+volatile int mouse_z;
+volatile int mouse_b;
+static int mickey_x, mickey_y;
 GFX_DRIVER * gfx_driver;
 static int current_depth = 8;
+static ALLEGRO_MOUSE_CURSOR *cursor;
+static ALLEGRO_BITMAP *cursor_bitmap;
+static int cursor_x, cursor_y;
 
 PALETTE current_palette;
 
@@ -88,7 +97,34 @@ int getb_depth(int color_depth, int c){
     return blue;
 }
 
-void poll_mouse(){
+int bitmap_mask_color(BITMAP *b){
+    return 0;
+}
+
+int poll_mouse(){
+    return 0;
+}
+
+void get_mouse_mickeys(int *x, int *y){
+    *x = mouse_x - mickey_x;
+    *y = mouse_y - mickey_y;
+    mickey_x = mouse_x;
+    mickey_y = mouse_y;
+}
+
+void set_mouse_sprite(BITMAP *sprite){
+    if (cursor) al_destroy_mouse_cursor(cursor);
+    cursor_bitmap = sprite->real;
+    cursor = al_create_mouse_cursor(cursor_bitmap, cursor_x, cursor_y);
+    al_set_mouse_cursor(display, cursor);
+}
+
+void set_mouse_sprite_focus(int x, int y){
+    if (cursor) al_destroy_mouse_cursor(cursor);
+    cursor_x = x;
+    cursor_y = y;
+    cursor = al_create_mouse_cursor(cursor_bitmap, cursor_x, cursor_y);
+    al_set_mouse_cursor(display, cursor);
 }
 
 int keypressed(){
@@ -122,7 +158,7 @@ void rest(int milliseconds){
 void vsync(){
 }
 
-void show_mouse(){
+void show_mouse(struct BITMAP *bmp){
 }
 
 void set_trans_blender(int r, int g, int b, int a){
@@ -210,7 +246,8 @@ BITMAP * create_bitmap(int width, int height){
 void install_timer(){
 }
 
-void install_mouse(){
+int install_mouse(){
+    return 2;
 }
 
 int install_keyboard(){
@@ -245,6 +282,7 @@ static int is_shift(int key){
 static void * read_keys(ALLEGRO_THREAD * self, void * arg){
     ALLEGRO_EVENT_QUEUE * queue = al_create_event_queue();
     al_register_event_source(queue, al_get_keyboard_event_source());
+    al_register_event_source(queue, al_get_mouse_event_source());
     while (true){
         ALLEGRO_EVENT event;
         al_wait_for_event(queue, &event);
@@ -277,6 +315,15 @@ static void * read_keys(ALLEGRO_THREAD * self, void * arg){
                 keybuffer[keybuffer_pos].modifiers = (event.keyboard.modifiers & ALLEGRO_KEYMOD_SHIFT) ? KB_SHIFT_FLAG : 0;
                 keybuffer_pos++;
             }
+        } else if (event.type == ALLEGRO_EVENT_MOUSE_AXES){
+            mouse_w = event.mouse.w;
+            mouse_x = event.mouse.x;
+            mouse_y = event.mouse.y;
+            mouse_z = event.mouse.z;
+        } else if (event.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN){
+            mouse_b |= 1 << (event.mouse.button - 1);
+        } else if (event.type == ALLEGRO_EVENT_MOUSE_BUTTON_UP){
+            mouse_b &= ~(1 << (event.mouse.button - 1));
         }
     }
 
@@ -301,6 +348,7 @@ int allegro_init(){
     al_init_image_addon();
     al_init_font_addon();
     al_install_keyboard();
+    al_install_mouse();
     // al_set_new_bitmap_flags(ALLEGRO_MEMORY_BITMAP);
     start_key_thread();
 
@@ -315,6 +363,11 @@ int allegro_init(){
     al_destroy_path(path);
 
     return is_ok(ok);
+}
+
+void circle(BITMAP * buffer, int x, int y, int radius, int color){
+    al_set_target_bitmap(buffer->real);
+    al_draw_circle(x, y, radius, a4color(color, current_depth), 1);
 }
 
 void rect(BITMAP * buffer, int x1, int y1, int x2, int y2, int color){
@@ -384,6 +437,25 @@ void textout_centre_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, AL_CONST cha
             y + al_get_font_line_height(f->real), a4color(bg, current_depth));
     }
     al_draw_text(f->real, a4color(color, current_depth), x, y, ALLEGRO_ALIGN_CENTRE, str);
+}
+
+void textout_right_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, AL_CONST char *str, int x, int y, int color, int bg){
+    al_set_target_bitmap(bmp->real);
+    if (bg != -1) {
+        int w = al_get_text_width(f->real, str);
+        al_draw_filled_rectangle(x - w / 2, y, x + w - w / 2,
+            y + al_get_font_line_height(f->real), a4color(bg, current_depth));
+    }
+    al_draw_text(f->real, a4color(color, current_depth), x, y, ALLEGRO_ALIGN_RIGHT, str);
+}
+
+void textprintf_right_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
+    char buffer[65536];
+    va_list args;
+    va_start(args, format);
+    vsprintf(buffer, format, args);
+    va_end(args);
+    textout_right_ex(bmp, f, buffer, x, y, color, bg);
 }
 
 void textprintf_centre_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){

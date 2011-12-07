@@ -44,8 +44,12 @@ def keys():
 def camera():
     return makeExample('excamera', ['excamera.c'])
 
+def mouse():
+    return makeExample('exmouse', ['exmouse.c'])
+
 stars()
 shade()
 bitmap()
 keys()
 camera()
+mouse()
