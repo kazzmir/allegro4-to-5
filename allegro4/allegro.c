@@ -173,6 +173,7 @@ int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualh
     display = al_create_display(width, height);
     screen = create_bitmap_from(al_get_backbuffer(display));
     palette_color = palette_color8;
+    set_palette(default_palette);
     setup_default_driver(screen);
     for (i = 0; i < 256; i++){
         palette_color8[i] = i;
@@ -292,6 +293,7 @@ static void start_key_thread(){
 }
 
 int allegro_init(){
+    int index;
     ALLEGRO_PATH *path;
     allegro_errno = &allegro_error;
     int ok = al_init();
@@ -301,6 +303,10 @@ int allegro_init(){
     al_install_keyboard();
     // al_set_new_bitmap_flags(ALLEGRO_MEMORY_BITMAP);
     start_key_thread();
+
+    for (index = 16; index < 256; index++){
+        desktop_palette[index] = desktop_palette[index & 15];
+    }
     
     path = al_get_standard_path(ALLEGRO_RESOURCES_PATH);
     al_append_path_component(path, "examples/");
