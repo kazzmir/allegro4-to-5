@@ -13,7 +13,7 @@ def allegroLibrary():
     env = defaultEnvironment()
     build = 'build-allegro'
     env.VariantDir(build, 'allegro4')
-    source = Split("""allegro.c math3d.c math.c file.c unicode.c color.c clip3df.c""")
+    source = Split("""allegro.c math3d.c math.c file.c unicode.c color.c clip3df.c datafile.c""")
     library = env.StaticLibrary('%s/allegro4-to-5' % build, ['%s/%s' % (build, file) for file in source])
     # Cache the allegro library so its not built each time allegroLibrary()
     # is called
@@ -50,6 +50,9 @@ def mouse():
 def config():
     return makeExample('exconfig', ['exconfig.c'])
 
+def data():
+    return makeExample('exdata', ['exdata.c'])
+
 stars()
 shade()
 bitmap()
@@ -57,3 +60,4 @@ keys()
 camera()
 mouse()
 config()
+data()

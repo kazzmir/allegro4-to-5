@@ -430,7 +430,8 @@ AL_FUNC(void, clear_bitmap, (BITMAP *bitmap));
 AL_FUNC(void, vsync, (void));
 int bitmap_color_depth(BITMAP * bitmap);
 void blit(BITMAP * from, BITMAP * to, int from_x, int from_y, int to_x, int to_y, int width, int height);
-
+void clear_to_color(BITMAP *bitmap, int color);
+int bitmap_mask_color(BITMAP *bitmap);
 
 /* Bitfield for relaying graphics driver type information */
 #define GFX_TYPE_UNKNOWN     0

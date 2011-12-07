@@ -207,6 +207,9 @@ void set_color_depth(int depth){
     current_depth = depth;
 }
 
+void set_color_conversion(int mode){
+}
+
 int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualheight){
     int i;
     display = al_create_display(width, height);
@@ -754,4 +757,8 @@ int get_config_int(char const *section, char const *name, int def){
     char const *v = al_get_config_value(current_config, section, name);
     if (!v) return def;
     return strtol(v, NULL, 10);
+}
+
+unsigned int _default_ds(){
+    return 0;
 }
