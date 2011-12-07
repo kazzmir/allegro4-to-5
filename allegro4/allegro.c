@@ -160,6 +160,12 @@ static void setup_default_driver(BITMAP * screen){
     gfx_driver->h = al_get_bitmap_height(screen->real);
 }
 
+/* I think this method can be called after some colors are already generated.
+ */
+void set_color_depth(int depth){
+    current_depth = depth;
+}
+
 int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualheight){
     int i;
     display = al_create_display(width, height);
