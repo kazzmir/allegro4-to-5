@@ -533,11 +533,12 @@ void polygon3d_f(BITMAP * bitmap, int type, BITMAP * texture, int vc, V3D_f * vt
     for (index = 0; index < vc; index++){
         a5_vertexes[index].x = vtx[index]->x;
         a5_vertexes[index].y = vtx[index]->y;
-        a5_vertexes[index].z = vtx[index]->z;
+        // a5_vertexes[index].z = vtx[index]->z;
+        /* FIXME: z depends on the camera, or something */
+        a5_vertexes[index].z = 0;
         a5_vertexes[index].u = vtx[index]->u;
         a5_vertexes[index].v = vtx[index]->v;
-        // a5_vertexes[index].color = a4color(color, current_depth);
-        a5_vertexes[index].color = al_map_rgb(255, 255, 255);
+        a5_vertexes[index].color = a4color(color, current_depth);
         
         /*
         printf("%d: x %f y %f z %f u %f v %f\n",
@@ -555,7 +556,6 @@ void polygon3d_f(BITMAP * bitmap, int type, BITMAP * texture, int vc, V3D_f * vt
         a5_texture = texture->real;
     }
 
-    al_draw_circle(vtx[0]->x, vtx[0]->y, 4, al_map_rgb(255, 255, 255), 3);
     /* FIXME: handle the 'type' parameter */
     al_draw_prim(a5_vertexes, NULL, a5_texture, 0, vc, ALLEGRO_PRIM_TRIANGLE_FAN);
 
