@@ -5,6 +5,14 @@ def defaultEnvironment():
     env.Append(CCFLAGS = ['-g3', '-Wall'])
     return env
 
+def allegro4Environment():
+    env = defaultEnvironment()
+    env.ParseConfig('pkg-config allegro-5.1 allegro_primitives-5.1 allegro_image-5.1 allegro_font-5.1 --cflags --libs')
+    env.Prepend(LIBS = [allegroLibrary(), 'm'])
+    # env.Prepend(LIBS = [allegroLibrary()])
+    env.Append(CPPPATH = ['#allegro4'])
+    return env
+
 allegro_store = [None]
 def allegroLibrary():
     # Return the cached version
@@ -22,12 +30,8 @@ def allegroLibrary():
     return allegro_store[0]
 
 def makeExample(name, source):
-    env = defaultEnvironment()
-    env.ParseConfig('pkg-config allegro-5.1 allegro_primitives-5.1 allegro_image-5.1 allegro_font-5.1 --cflags --libs')
+    env = allegro4Environment()
     env.VariantDir('build-examples', 'examples')
-    env.Prepend(LIBS = [allegroLibrary(), 'm'])
-    # env.Prepend(LIBS = [allegroLibrary()])
-    env.Append(CPPPATH = ['allegro4'])
     return env.Program(name, map(lambda x: 'build-examples/%s' % x, source))
 
 def stars():
