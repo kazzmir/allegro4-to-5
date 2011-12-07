@@ -21,6 +21,8 @@
 #include "include/midi.h"
 #include "include/sound.h"
 #include "include/config.h"
+#include "include/rle.h"
+#include "include/compiled.h"
 
 #ifdef __cplusplus
    extern "C" {
