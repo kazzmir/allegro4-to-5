@@ -11,10 +11,11 @@ def allegroLibrary():
     if allegro_store[0] != None:
         return allegro_store[0]
     env = defaultEnvironment()
-    build = 'build-allegro'
-    env.VariantDir(build, 'allegro4')
-    source = Split("""allegro.c math3d.c math.c file.c unicode.c color.c clip3df.c""")
-    library = env.StaticLibrary('%s/allegro4-to-5' % build, ['%s/%s' % (build, file) for file in source])
+    library = SConscript('allegro4/SConscript', variant_dir = 'build-allegro', exports = ['env'])
+    #build = 'build-allegro'
+    #env.VariantDir(build, 'allegro4')
+    #source = Split("""allegro.c math3d.c math.c file.c unicode.c color.c clip3df.c""")
+    #library = env.StaticLibrary('%s/allegro4-to-5' % build, ['%s/%s' % (build, file) for file in source])
     # Cache the allegro library so its not built each time allegroLibrary()
     # is called
     allegro_store[0] = library
