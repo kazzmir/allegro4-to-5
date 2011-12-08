@@ -12,6 +12,8 @@ int AL_RAND(){
 #include <allegro5/allegro_image.h>
 #include <allegro5/allegro_font.h>
 
+#include "include/internal/aintern.h"
+
 #define KEYBUFFER_LENGTH 256
 
 typedef struct {int keycode, unicode, modifiers;} KEYBUFFER_ENTRY;
@@ -228,14 +230,70 @@ void create_rgb_table(RGB_MAP *table, AL_CONST PALETTE pal, AL_METHOD(void, call
 void create_light_table(COLOR_MAP *table, AL_CONST PALETTE pal, int r, int g, int b, AL_METHOD(void, callback, (int pos))){
 }
 
-static BITMAP * create_bitmap_from(ALLEGRO_BITMAP * real, int depth){
+static void lazily_create_real_bitmap(BITMAP *bitmap, int is_mono_font){
+    if (bitmap->real) return;
+    bitmap->real = al_create_bitmap(bitmap->w, bitmap->h);
+    ALLEGRO_LOCKED_REGION *lock = al_lock_bitmap(bitmap->real,
+        ALLEGRO_PIXEL_FORMAT_ABGR_8888_LE, ALLEGRO_LOCK_WRITEONLY);
+    char *rgba = lock->data;
+    if (bitmap->depth == 8){
+        int x, y;
+        for (y = 0; y < bitmap->h; y++){
+            for (x = 0; x < bitmap->w; x++){
+                int c = *(bitmap->line[y] + x);
+                unsigned char red = current_palette[c].r * 4;
+                unsigned char green = current_palette[c].g * 4;
+                unsigned char blue = current_palette[c].b * 4;
+                char alpha = 255;
+                if (is_mono_font && c)
+                    red = green = blue = 255;
+                rgba[y * lock->pitch + x * 4 + 0] = red;
+                rgba[y * lock->pitch + x * 4 + 1] = green;
+                rgba[y * lock->pitch + x * 4 + 2] = blue;
+                rgba[y * lock->pitch + x * 4 + 3] = alpha;
+            }
+        }
+    }
+    al_unlock_bitmap(bitmap->real);
+}
+
+static void lazily_create_real_font(FONT *f){
+    if (f->real) return;
+    if (!f->data) return;
+    // FIXME: additional glyph ranges
+    FONT_COLOR_DATA *cf = f->data;
+    int maxchars = cf->end - cf->begin;
+    int i, w = 0, h = 0;
+    for (i = 0; i < maxchars; i++) {
+        w += cf->bitmaps[i]->w;
+        h = MAX(h, cf->bitmaps[i]->h);
+    }
+
+    ALLEGRO_BITMAP *sheet = al_create_bitmap(w + maxchars + 1, h + 2);
+   
+    ALLEGRO_STATE state;
+    al_store_state(&state, ALLEGRO_STATE_BLENDER);
+    al_set_target_bitmap(sheet);
+    al_clear_to_color(al_map_rgba(255, 255, 0, 0));
+    al_set_blender(ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_ZERO);
+    int x = 1;
+    for (i = 0; i < maxchars; i++) {
+        lazily_create_real_bitmap(cf->bitmaps[i], 1);
+        al_draw_bitmap(cf->bitmaps[i]->real, x, 1, 0);
+        x += cf->bitmaps[i]->w + 1;
+    }
+    al_restore_state(&state);
+    int ranges[] = {cf->begin, cf->end - 1};
+    f->real = al_grab_font_from_bitmap(sheet, 1, ranges);
+    al_destroy_bitmap(sheet);
+}
+
+BITMAP * create_bitmap_ex(int depth, int width, int height){
+    BITMAP * bitmap = al_calloc(1, sizeof(BITMAP));
     int i;
-    BITMAP * bitmap = malloc(sizeof(BITMAP));
-    bitmap->real = real;
-    bitmap->w = al_get_bitmap_width(real);
-    bitmap->h = al_get_bitmap_height(real);
+    bitmap->w = width;
+    bitmap->h = height;
     bitmap->depth = depth;
-    
     int size = (depth + 7) / 8;
     /* always use 32-bit RGBA for dat? */
     bitmap->dat = al_malloc(bitmap->w * bitmap->h * size);
@@ -244,20 +302,22 @@ static BITMAP * create_bitmap_from(ALLEGRO_BITMAP * real, int depth){
         bitmap->line[i] = bitmap->dat;
         bitmap->line[i] += i * size * bitmap->w;
     }
-
     return bitmap;
-}
-
-BITMAP * create_bitmap_ex(int depth, int width, int height){
-    return create_bitmap_from(al_create_bitmap(width, height), depth);
 }
 
 BITMAP * create_bitmap(int width, int height){
     return create_bitmap_ex(current_depth, width, height);
 }
 
+static BITMAP * create_bitmap_from(ALLEGRO_BITMAP * real){
+    BITMAP *bitmap = create_bitmap_ex(32, al_get_bitmap_width(real),
+        al_get_bitmap_height(real));
+    bitmap->real = real;
+    return bitmap;
+}
+
 BITMAP * load_bitmap(const char * path,struct RGB *pal){
-    return create_bitmap_from(al_load_bitmap(path), current_depth);
+    return create_bitmap_from(al_load_bitmap(path));
 }
 
 struct BITMAP * load_bmp(AL_CONST char *filename, struct RGB *pal){
@@ -265,8 +325,8 @@ struct BITMAP * load_bmp(AL_CONST char *filename, struct RGB *pal){
 }
 
 void destroy_bitmap(BITMAP* bitmap){
-    al_destroy_bitmap(bitmap->real);
-    free(bitmap);
+    if (bitmap->real) al_destroy_bitmap(bitmap->real);
+    al_free(bitmap);
 }
 
 int poll_keyboard(){
@@ -276,8 +336,8 @@ int poll_keyboard(){
 static void setup_default_driver(BITMAP * screen){
     gfx_driver = al_malloc(sizeof(GFX_DRIVER));
     memset(gfx_driver, 0, sizeof(GFX_DRIVER));
-    gfx_driver->w = al_get_bitmap_width(screen->real);
-    gfx_driver->h = al_get_bitmap_height(screen->real);
+    gfx_driver->w = screen->w;
+    gfx_driver->h = screen->h;
 }
 
 /* I think this method can be called after some colors are already generated.
@@ -292,7 +352,7 @@ void set_color_conversion(int mode){
 int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualheight){
     int i;
     display = al_create_display(width, height);
-    screen = create_bitmap_from(al_get_backbuffer(display), 32);
+    screen = create_bitmap_from(al_get_backbuffer(display));
     palette_color = palette_color8;
     set_palette(default_palette);
     setup_default_driver(screen);
@@ -317,29 +377,6 @@ void allegro_message(char const *format, ...){
     va_start(args, format);
     vprintf(format, args);
     va_end(args);
-}
-
-void a4_fix_bitmap(BITMAP *bitmap, PALETTE palette){
-    ALLEGRO_LOCKED_REGION *lock = al_lock_bitmap(bitmap->real,
-        ALLEGRO_PIXEL_FORMAT_ABGR_8888_LE, ALLEGRO_LOCK_WRITEONLY);
-    char *rgba = lock->data;
-    if (bitmap->depth == 8){
-        int x, y;
-        for (y = 0; y < bitmap->h; y++){
-            for (x = 0; x < bitmap->w; x++){
-                int c = *(bitmap->line[y] + x);
-                char red = palette[c].r;
-                char green = palette[c].g;
-                char blue = palette[c].b;
-                char alpha = 255;
-                rgba[y * lock->pitch + x * 4 + 0] = red;
-                rgba[y * lock->pitch + x * 4 + 1] = green;
-                rgba[y * lock->pitch + x * 4 + 2] = blue;
-                rgba[y * lock->pitch + x * 4 + 3] = alpha;
-            }
-        }
-    }
-    al_unlock_bitmap(bitmap->real);
 }
 
 void install_timer(){
@@ -529,6 +566,9 @@ static void maybe_flip_screen(BITMAP * where){
 void stretch_blit(BITMAP *source, BITMAP *dest, int source_x,
     int source_y, int source_width, int source_height, int dest_x,
     int dest_y, int dest_width, int dest_height){
+        
+    lazily_create_real_bitmap(source, 0);
+        
     ALLEGRO_BITMAP * al_from = source->real;
     ALLEGRO_BITMAP * al_to = dest->real;
      /* A4 allows drawing a bitmap to itself, A5 does not. */
@@ -557,7 +597,7 @@ void draw_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y){
     blit(sprite, bmp, 0, 0, x, y, sprite->w, sprite->h);
 }
 
-void textprintf_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
+void textprintf_ex(struct BITMAP *bmp, struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
     char buffer[65536];
     va_list args;
     va_start(args, format);
@@ -566,7 +606,8 @@ void textprintf_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, int x, int y, in
     textout_ex(bmp, f, buffer, x, y, color, bg);
 }
 
-void textout_centre_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, AL_CONST char *str, int x, int y, int color, int bg){
+void textout_centre_ex(struct BITMAP *bmp, struct FONT *f, AL_CONST char *str, int x, int y, int color, int bg){
+    lazily_create_real_font(f);
     al_set_target_bitmap(bmp->real);
     if (bg != -1) {
         int w = al_get_text_width(f->real, str);
@@ -576,7 +617,8 @@ void textout_centre_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, AL_CONST cha
     al_draw_text(f->real, a5color(color, current_depth), x, y, ALLEGRO_ALIGN_CENTRE, str);
 }
 
-void textout_right_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, AL_CONST char *str, int x, int y, int color, int bg){
+void textout_right_ex(struct BITMAP *bmp, struct FONT *f, AL_CONST char *str, int x, int y, int color, int bg){
+    lazily_create_real_font(f);
     al_set_target_bitmap(bmp->real);
     if (bg != -1) {
         int w = al_get_text_width(f->real, str);
@@ -586,7 +628,7 @@ void textout_right_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, AL_CONST char
     al_draw_text(f->real, a5color(color, current_depth), x, y, ALLEGRO_ALIGN_RIGHT, str);
 }
 
-void textprintf_right_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
+void textprintf_right_ex(struct BITMAP *bmp, struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
     char buffer[65536];
     va_list args;
     va_start(args, format);
@@ -595,7 +637,7 @@ void textprintf_right_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, int x, int
     textout_right_ex(bmp, f, buffer, x, y, color, bg);
 }
 
-void textprintf_centre_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
+void textprintf_centre_ex(struct BITMAP *bmp, struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
     char buffer[65536];
     va_list args;
     va_start(args, format);
@@ -604,7 +646,8 @@ void textprintf_centre_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, int x, in
     textout_centre_ex(bmp, f, buffer, x, y, color, bg);
 }
 
-void textout_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, AL_CONST char *str, int x, int y, int color, int bg){
+void textout_ex(struct BITMAP *bmp, struct FONT *f, AL_CONST char *str, int x, int y, int color, int bg){
+    lazily_create_real_font(f);
     al_set_target_bitmap(bmp->real);
     if (bg != -1) {
         al_draw_filled_rectangle(x, y, x + al_get_text_width(f->real, str),
@@ -1108,6 +1151,6 @@ COMPILED_SPRITE *get_compiled_sprite(BITMAP *bitmap, int planar){
     return bitmap;
 }
 
-void *_al_sane_realloc(void *ptr, int size){
+void *_al_sane_realloc(void *ptr, size_t size){
     return al_realloc(ptr, size);
 }

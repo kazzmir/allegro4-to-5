@@ -227,8 +227,6 @@ static BITMAP *read_bitmap(PACKFILE *f, int bits, int allowconv)
       blit(tmp, bmp, 0, 0, 0, 0, bmp->w, bmp->h);
       destroy_bitmap(tmp);
    }
-   
-   a4_fix_bitmap(bmp, current_palette);
 
    return bmp;
 }
@@ -298,9 +296,9 @@ static FONT *read_font_prop(PACKFILE *pack, int maxchars)
    FONT *f = NULL;
    FONT_COLOR_DATA *cf = NULL;
    BITMAP **bits = NULL;
-   int i = 0, h = 0, w = 0;
+   int i = 0, h = 0;
 
-   f = _AL_MALLOC(sizeof(FONT));
+   f = al_calloc(1, sizeof(FONT));
    cf = _AL_MALLOC(sizeof(FONT_COLOR_DATA));
    bits = _AL_MALLOC(sizeof(BITMAP *) * maxchars);
    
@@ -347,29 +345,7 @@ static FONT *read_font_prop(PACKFILE *pack, int maxchars)
    }
    
    f->height = h;
-   
-   for (i = 0; i < maxchars; i++) {
-      w += bits[i]->w;
-   }
-   
-   ALLEGRO_BITMAP *sheet = al_create_bitmap(w + maxchars + 1, h + 2);
-   
-   ALLEGRO_STATE state;
-   al_store_state(&state, ALLEGRO_STATE_BLENDER);
-   al_set_target_bitmap(sheet);
-   al_clear_to_color(al_map_rgba(255, 255, 0, 0));
-   al_set_blender(ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_ZERO);
-   int x = 1;
-   for (i = 0; i < maxchars; i++) {
-      al_draw_bitmap(bits[i]->real, x, 1, 0);
-      x += bits[i]->w + 1;
-   }
-   al_restore_state(&state);
-   int ranges[] = {cf->begin, cf->end - 1};
-   f->real = al_grab_font_from_bitmap(sheet, 1, ranges);
 
-   al_destroy_bitmap(sheet);
-   
    return f;
 }
 
@@ -1864,19 +1840,7 @@ static void initialise_datafile(DATAFILE *data)
 
          case DAT_FONT:
             f = data[c].dat;
-//          color_flag = (int)(uintptr_t)f->vtable;
-            if (color_flag == 1) {
-               FONT_COLOR_DATA *cf = (FONT_COLOR_DATA *)f->data;
-               while (cf) {
-                  for (c2 = cf->begin; c2 < cf->end; c2++)
-                     initialise_bitmap((BITMAP *)cf->bitmaps[c2 - cf->begin]);
-                  cf = cf->next;
-               }
-//             f->vtable = font_vtable_color;
-            }
-            else {
-//             f->vtable = font_vtable_mono;
-            }
+
             break;
 
          case DAT_SAMPLE:
