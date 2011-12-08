@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include <allegro5/allegro.h>
+#include <allegro5/allegro_font.h>
 
 #include "allegro.h"
 #include "include/internal/aintern.h"
@@ -295,8 +296,8 @@ static FONT *read_font_prop(PACKFILE *pack, int maxchars)
    FONT *f = NULL;
    FONT_COLOR_DATA *cf = NULL;
    BITMAP **bits = NULL;
-   int i = 0, h = 0;
-   
+   int i = 0, h = 0, w = 0;
+
    f = _AL_MALLOC(sizeof(FONT));
    cf = _AL_MALLOC(sizeof(FONT_COLOR_DATA));
    bits = _AL_MALLOC(sizeof(BITMAP *) * maxchars);
@@ -344,6 +345,28 @@ static FONT *read_font_prop(PACKFILE *pack, int maxchars)
    }
    
    f->height = h;
+   
+   for (i = 0; i < maxchars; i++) {
+      w += bits[i]->w;
+   }
+   
+   ALLEGRO_BITMAP *sheet = al_create_bitmap(w + maxchars + 1, h + 2);
+   
+   ALLEGRO_STATE state;
+   al_store_state(&state, ALLEGRO_STATE_BLENDER);
+   al_set_target_bitmap(sheet);
+   al_clear_to_color(al_map_rgba(255, 255, 0, 0));
+   al_set_blender(ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_ZERO);
+   int x = 1;
+   for (i = 0; i < maxchars; i++) {
+      al_draw_bitmap(bits[i]->real, x, 1, 0);
+      x += bits[i]->w + 1;
+   }
+   al_restore_state(&state);
+   int ranges[] = {cf->begin, cf->end - 1};
+   f->real = al_grab_font_from_bitmap(sheet, 1, ranges);
+
+   al_destroy_bitmap(sheet);
    
    return f;
 }

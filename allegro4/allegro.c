@@ -312,7 +312,7 @@ void allegro_message(char const *format, ...){
     va_end(args);
 }
 
-BITMAP * create_bitmap_ex(int width, int height, int depth){
+BITMAP * create_bitmap_ex(int depth, int width, int height){
     return create_bitmap(width, height);
 }
 
