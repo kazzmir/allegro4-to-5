@@ -368,6 +368,7 @@ void set_projection_viewport(){
 */
 
 void clear_bitmap(BITMAP * bitmap){
+    lazily_create_real_bitmap(bitmap, 0);
     al_set_target_bitmap(bitmap->real);
     al_clear_to_color(al_map_rgb(0, 0, 0));
 }
