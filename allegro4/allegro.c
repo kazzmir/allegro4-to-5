@@ -18,13 +18,18 @@ typedef struct {int keycode, unicode, modifiers;} KEYBUFFER_ENTRY;
 
 volatile long midi_pos;
 int gfx_capabilities;
-int * allegro_errno;
+
+int _allegro_errno;
+int * allegro_errno = &_allegro_errno;
 char allegro_id[] = "Allegro 4 to 5 Layer Version 0.1";
 char allegro_error[ALLEGRO_ERROR_SIZE];
+
 volatile char key[KEY_MAX];
 static volatile KEYBUFFER_ENTRY keybuffer[KEYBUFFER_LENGTH];
 static volatile int keybuffer_pos;
 volatile int key_shifts;
+SYSTEM_DRIVER _system_driver = {0, "A5", "A5", "A5"};
+SYSTEM_DRIVER *system_driver = &_system_driver;
 KEYBOARD_DRIVER _keyboard_driver = {0, "A5", "A5", "A5", 0};
 KEYBOARD_DRIVER *keyboard_driver = &_keyboard_driver;
 MOUSE_DRIVER _mouse_driver = {0, "A5", "A5", "A5"};
@@ -42,7 +47,7 @@ volatile int mouse_z;
 volatile int mouse_b;
 static int mickey_x, mickey_y;
 GFX_DRIVER * gfx_driver;
-static int current_depth = 8;
+int current_depth = 8;
 static ALLEGRO_MOUSE_CURSOR *cursor;
 static ALLEGRO_BITMAP *cursor_bitmap;
 static int cursor_x, cursor_y;
@@ -59,6 +64,30 @@ RGB_MAP * rgb_map;
 COLOR_MAP * color_map;
 
 int palette_color8[256];
+
+/* lookup table for scaling 5 bit colors up to 8 bits */
+int _rgb_scale_5[32] =
+{
+   0,   8,   16,  24,  33,  41,  49,  57,
+   66,  74,  82,  90,  99,  107, 115, 123,
+   132, 140, 148, 156, 165, 173, 181, 189,
+   198, 206, 214, 222, 231, 239, 247, 255
+};
+
+
+/* lookup table for scaling 6 bit colors up to 8 bits */
+int _rgb_scale_6[64] =
+{
+   0,   4,   8,   12,  16,  20,  24,  28,
+   32,  36,  40,  44,  48,  52,  56,  60,
+   65,  69,  73,  77,  81,  85,  89,  93,
+   97,  101, 105, 109, 113, 117, 121, 125,
+   130, 134, 138, 142, 146, 150, 154, 158,
+   162, 166, 170, 174, 178, 182, 186, 190,
+   195, 199, 203, 207, 211, 215, 219, 223,
+   227, 231, 235, 239, 243, 247, 251, 255
+};
+
 
 /*
 struct BITMAP{
@@ -200,11 +229,24 @@ void create_light_table(COLOR_MAP *table, AL_CONST PALETTE pal, int r, int g, in
 }
 
 static BITMAP * create_bitmap_from(ALLEGRO_BITMAP * real){
+    int i;
     BITMAP * bitmap = malloc(sizeof(BITMAP));
     bitmap->real = real;
     bitmap->w = al_get_bitmap_width(real);
     bitmap->h = al_get_bitmap_height(real);
+    
+    /* always use 32-bit RGBA for dat? */
+    bitmap->dat = al_malloc(bitmap->w * bitmap->h * 4);
+    bitmap->line = al_malloc(bitmap->h * sizeof *bitmap->line);
+    for (i = 0; i < bitmap->h; i++) {
+        bitmap->line[i] = bitmap->dat + i * 4 * bitmap->w;
+    }
+
     return bitmap;
+}
+
+BITMAP * create_bitmap(int width, int height){
+    return create_bitmap_from(al_create_bitmap(width, height));
 }
 
 BITMAP * load_bitmap(const char * path,struct RGB *pal){
@@ -270,13 +312,8 @@ void allegro_message(char const *format, ...){
     va_end(args);
 }
 
-BITMAP * create_bitmap(int width, int height){
-    // return (BITMAP*) al_create_bitmap(width, height);
-    BITMAP * bitmap = malloc(sizeof(BITMAP));
-    bitmap->w = width;
-    bitmap->h = height;
-    bitmap->real = al_create_bitmap(width, height);
-    return bitmap;
+BITMAP * create_bitmap_ex(int width, int height, int depth){
+    return create_bitmap(width, height);
 }
 
 void install_timer(){
@@ -382,7 +419,6 @@ int install_allegro(int system_id, int *errno_ptr, int (*atexit_ptr)(void (*func
 int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_ptr)(void (*func)(void)), int version){
     int index;
     ALLEGRO_PATH *path;
-    allegro_errno = &allegro_error;
     int ok = al_init();
     current_config = al_create_config();
     al_init_primitives_addon();
@@ -437,6 +473,19 @@ void putpixel(BITMAP * buffer, int x, int y, int color){
     al_put_pixel(x, y, a5color(color, current_depth));
 }
 
+void line(BITMAP * buffer, int x, int y, int x2, int y2, int color){
+    al_set_target_bitmap(buffer->real);
+    al_draw_line(x, y, x2, y2, a5color(color, current_depth), 1);
+}
+
+void hline(BITMAP * buffer, int x, int y, int x2, int color){
+    line(buffer, x, y, x2, y, color);
+}
+
+void vline(BITMAP * buffer, int x, int y, int y2, int color){
+    line(buffer, x, y, x, y2, color);
+}
+
 void set_palette(const PALETTE palette){
     memcpy(current_palette, palette, sizeof(PALETTE));
 }
@@ -476,6 +525,10 @@ void stretch_blit(BITMAP *source, BITMAP *dest, int source_x,
 
 void blit(BITMAP * from, BITMAP * to, int from_x, int from_y, int to_x, int to_y, int width, int height){
     stretch_blit(from, to, from_x, from_y, width, height, to_x, to_y, width, height);
+}
+
+void draw_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y){
+    blit(sprite, bmp, 0, 0, x, y, sprite->w, sprite->h);
 }
 
 void textprintf_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
@@ -806,6 +859,30 @@ unsigned int _default_ds(){
     return 0;
 }
 
+void _al_getdcwd(int drive, char *buf, int size){
+    char *d = al_get_current_directory();
+    strncpy(buf, d, size);
+    al_free(d);
+}
+
+int _al_file_isok(char const *filename){
+    return 1;
+}
+
+char *_al_strdup(char const *s){
+    return strdup(s);
+}
+
+void get_executable_name(char *buf, int size){
+    ALLEGRO_PATH *path = al_get_standard_path(ALLEGRO_EXENAME_PATH);
+    strncpy(buf, al_path_cstr(path, '/'), size);
+    al_destroy_path(path);
+}
+
+int _color_load_depth(int depth, int hasalpha){
+    return depth;
+}
+
 int request_video_bitmap(struct BITMAP *bitmap){
     /* FIXME */
     return -1;
@@ -887,35 +964,8 @@ int text_height(AL_CONST struct FONT *f){
     return -1;
 }
 
-int MIN(int a, int b){
-    return a < b ? a : b;
-}
-
-int MAX(int a, int b){
-    return a > b ? a : b;
-}
-
-int MID(int x, int y, int z){
-    return ((x) > (y) ? ((y) > (z) ? (y) : ((x) > (z) ?
-                                            (z) : (x))) : ((y) > (z) ? ((z) > (x) ? (z) :
-                                                                        (x)): (y)));
-}
-
-void vline(struct BITMAP *bmp, int x, int y_1, int y2, int color){
-    /* FIXME */
-}
-
-void hline(struct BITMAP *bmp, int x1, int y, int x2, int color){
-    /* FIXME */
-}
-
 void set_keyboard_rate(int delay, int repeat){
     /* FIXME */
-}
-
-void get_executable_name(char *output, int size){
-    const char * name = al_get_app_name();
-    strncpy(output, name, size);
 }
 
 void set_config_int(AL_CONST char *section, AL_CONST char *name, int val){
@@ -1005,4 +1055,33 @@ int stricmp(AL_CONST char *s1, AL_CONST char *s2){
 
 void release_voice(int voice){
     /* FIXME */
+}
+
+void destroy_font(FONT *f){
+    al_destroy_font(f->real);
+    al_free(f);
+}
+
+void destroy_rle_sprite(RLE_SPRITE *rle){
+    destroy_bitmap(rle);
+}
+
+void destroy_compiled_sprite(COMPILED_SPRITE *sprite){
+    destroy_bitmap(sprite);
+}
+
+void draw_rle_sprite(BITMAP *bmp, RLE_SPRITE *sprite, int x, int y){
+    draw_sprite(bmp, sprite, x, y);
+}
+
+RLE_SPRITE *get_rle_sprite(BITMAP *bitmap){
+    return bitmap;
+}
+
+COMPILED_SPRITE *get_compiled_sprite(BITMAP *bitmap, int planar){
+    return bitmap;
+}
+
+void *_al_sane_realloc(void *ptr, int size){
+    return al_realloc(ptr, size);
 }

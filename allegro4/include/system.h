@@ -192,60 +192,22 @@ AL_VAR(int, cpu_model);
 AL_VAR(int, cpu_capabilities);
 
 
-/*
 typedef struct SYSTEM_DRIVER
 {
    int  id;
    AL_CONST char *name;
    AL_CONST char *desc;
    AL_CONST char *ascii_name;
-   AL_METHOD(int, init, (void));
-   AL_METHOD(void, exit, (void));
-   AL_METHOD(void, get_executable_name, (char *output, int size));
-   AL_METHOD(int, find_resource, (char *dest, AL_CONST char *resource, int size));
-   AL_METHOD(void, set_window_title, (AL_CONST char *name));
-   AL_METHOD(int, set_close_button_callback, (AL_METHOD(void, proc, (void))));
-   AL_METHOD(void, message, (AL_CONST char *msg));
-   AL_METHOD(void, assert, (AL_CONST char *msg));
-   AL_METHOD(void, save_console_state, (void));
-   AL_METHOD(void, restore_console_state, (void));
-   AL_METHOD(struct BITMAP *, create_bitmap, (int color_depth, int width, int height));
-   AL_METHOD(void, created_bitmap, (struct BITMAP *bmp));
-   AL_METHOD(struct BITMAP *, create_sub_bitmap, (struct BITMAP *parent, int x, int y, int width, int height));
-   AL_METHOD(void, created_sub_bitmap, (struct BITMAP *bmp, struct BITMAP *parent));
-   AL_METHOD(int, destroy_bitmap, (struct BITMAP *bitmap));
-   AL_METHOD(void, read_hardware_palette, (void));
-   AL_METHOD(void, set_palette_range, (AL_CONST struct RGB *p, int from, int to, int retracesync));
-   AL_METHOD(struct GFX_VTABLE *, get_vtable, (int color_depth));
-   AL_METHOD(int, set_display_switch_mode, (int mode));
-   AL_METHOD(void, display_switch_lock, (int lock, int foreground));
-   AL_METHOD(int, desktop_color_depth, (void));
-   AL_METHOD(int, get_desktop_resolution, (int *width, int *height));
-   AL_METHOD(void, get_gfx_safe_mode, (int *driver, struct GFX_MODE *mode));
-   AL_METHOD(void, yield_timeslice, (void));
-   AL_METHOD(void *, create_mutex, (void));
-   AL_METHOD(void, destroy_mutex, (void *handle));
-   AL_METHOD(void, lock_mutex, (void *handle));
-   AL_METHOD(void, unlock_mutex, (void *handle));
-   AL_METHOD(_DRIVER_INFO *, gfx_drivers, (void));
-   AL_METHOD(_DRIVER_INFO *, digi_drivers, (void));
-   AL_METHOD(_DRIVER_INFO *, midi_drivers, (void));
-   AL_METHOD(_DRIVER_INFO *, keyboard_drivers, (void));
-   AL_METHOD(_DRIVER_INFO *, mouse_drivers, (void));
-   AL_METHOD(_DRIVER_INFO *, joystick_drivers, (void));
-   AL_METHOD(_DRIVER_INFO *, timer_drivers, (void));
 } SYSTEM_DRIVER;
 
 
 AL_VAR(SYSTEM_DRIVER, system_none);
 AL_VAR(SYSTEM_DRIVER *, system_driver);
-AL_ARRAY(_DRIVER_INFO, _system_driver_list);
-*/
+
 
 #ifdef __cplusplus
    }
 #endif
 
-// #include "inline/system.inl"
 
 #endif          /* ifndef ALLEGRO_SYSTEM_H */

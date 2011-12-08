@@ -34,9 +34,36 @@
    extern "C" {
 #endif
 
+#undef MIN
+#undef MAX
+#undef MID
+     
+#define MIN(x,y)     (((x) < (y)) ? (x) : (y))
+#define MAX(x,y)     (((x) > (y)) ? (x) : (y))
+
+/* Returns the median of x, y, z */
+#define MID(x,y,z)   ((x) > (y) ? ((y) > (z) ? (y) : ((x) > (z) ?    \
+                       (z) : (x))) : ((y) > (z) ? ((z) > (x) ? (z) : \
+                       (x)): (y)))
+
+/* Optimized version of MID for when x <= z. */
+#define CLAMP(x,y,z) MAX((x), MIN((y), (z)))
+     
+#undef ABS
+#define ABS(x)       (((x) >= 0) ? (x) : (-(x)))
+     
+#undef SGN
+#define SGN(x)       (((x) >= 0) ? 1 : -1)
+
+#define _color_depth current_depth
+
 // typedef struct BITMAP BITMAP;
 extern int * palette_color;
 extern BITMAP* screen;
+extern PALETTE current_palette;
+extern int current_depth;
+
+unsigned int _default_ds();
 
 #define END_OF_MAIN()
 

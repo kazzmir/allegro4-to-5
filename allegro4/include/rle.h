@@ -26,13 +26,7 @@
    extern "C" {
 #endif
 
-typedef struct RLE_SPRITE           /* a RLE compressed sprite */
-{
-   int w, h;                        /* width and height in pixels */
-   int color_depth;                 /* color depth of the image */
-   int size;                        /* size of sprite data in bytes */
-   ZERO_SIZE_ARRAY(signed char, dat);
-} RLE_SPRITE;
+typedef struct BITMAP RLE_SPRITE;
 
 
 AL_FUNC(RLE_SPRITE *, get_rle_sprite, (struct BITMAP *bitmap));
