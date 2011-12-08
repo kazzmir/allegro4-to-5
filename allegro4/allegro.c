@@ -76,25 +76,25 @@ static int is_ok(int code){
     return -1;
 }
 
-/* FIXME: this should be renamed to a5color */
-static ALLEGRO_COLOR a4color(int color, int bit_depth){
+/* returns an A5 color (ALLEGRO_COLOR) given an A4 packed int */
+static ALLEGRO_COLOR a5color(int a4color, int bit_depth){
     if (bit_depth == 8){
-        RGB * rgb = &current_palette[color];
+        RGB * rgb = &current_palette[a4color];
         return al_map_rgb(rgb->r * 4, rgb->g * 4, rgb->b * 4);
     }
     /* FIXME: handle other depths */
     return al_map_rgb(1, 1, 1);
 }
 
-/* FIXME: this should be renamed to a4color */
-static int make_color(ALLEGRO_COLOR color, int bit_depth){
+/* returns an a4 color (packed int) given an A5 ALLEGRO_COLOR */
+static int a4color(ALLEGRO_COLOR color, int bit_depth){
     unsigned char red, green, blue;
     al_unmap_rgb(color, &red, &green, &blue);
     return makecol_depth(bit_depth, red, green, blue);
 }
 
 int getr_depth(int color_depth, int c){
-    ALLEGRO_COLOR color = a4color(c, color_depth);
+    ALLEGRO_COLOR color = a5color(c, color_depth);
     unsigned char red, green, blue;
     al_unmap_rgb(color, &red, &green, &blue);
     return red;
@@ -105,7 +105,7 @@ int getr(int color){
 }
 
 int getg_depth(int color_depth, int c){
-    ALLEGRO_COLOR color = a4color(c, color_depth);
+    ALLEGRO_COLOR color = a5color(c, color_depth);
     unsigned char red, green, blue;
     al_unmap_rgb(color, &red, &green, &blue);
     return green;
@@ -116,7 +116,7 @@ int getg(int color){
 }
 
 int getb_depth(int color_depth, int c){
-    ALLEGRO_COLOR color = a4color(c, color_depth);
+    ALLEGRO_COLOR color = a5color(c, color_depth);
     unsigned char red, green, blue;
     al_unmap_rgb(color, &red, &green, &blue);
     return blue;
@@ -408,33 +408,33 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
 
 void circle(BITMAP * buffer, int x, int y, int radius, int color){
     al_set_target_bitmap(buffer->real);
-    al_draw_circle(x, y, radius, a4color(color, current_depth), 1);
+    al_draw_circle(x, y, radius, a5color(color, current_depth), 1);
 }
 
 void rect(BITMAP * buffer, int x1, int y1, int x2, int y2, int color){
     al_set_target_bitmap(buffer->real);
-    al_draw_rectangle(x1, y1, x2+1, y2+1, a4color(color, current_depth), 1);
+    al_draw_rectangle(x1, y1, x2+1, y2+1, a5color(color, current_depth), 1);
 }
 
 void rectfill(BITMAP * buffer, int x1, int y1, int x2, int y2, int color){
     al_set_target_bitmap(buffer->real);
-    al_draw_filled_rectangle(x1, y1, x2+1, y2+1, a4color(color, current_depth));
+    al_draw_filled_rectangle(x1, y1, x2+1, y2+1, a5color(color, current_depth));
 }
 
 void triangle(BITMAP * buffer, int x1, int y1, int x2, int y2, int x3, int y3, int color){
     al_set_target_bitmap(buffer->real);
-    al_draw_filled_triangle(x1, y1, x2, y2, x3, y3, a4color(color, current_depth));
+    al_draw_filled_triangle(x1, y1, x2, y2, x3, y3, a5color(color, current_depth));
 }
 
 int getpixel(BITMAP * buffer, int x, int y){
     ALLEGRO_BITMAP * al_buffer = buffer->real;
-    return make_color(al_get_pixel(al_buffer, x, y), current_depth);
+    return a4color(al_get_pixel(al_buffer, x, y), current_depth);
 }
 
 void putpixel(BITMAP * buffer, int x, int y, int color){
     ALLEGRO_BITMAP * al_buffer = buffer->real;
     al_set_target_bitmap(al_buffer);
-    al_put_pixel(x, y, a4color(color, current_depth));
+    al_put_pixel(x, y, a5color(color, current_depth));
 }
 
 void set_palette(const PALETTE palette){
@@ -492,9 +492,9 @@ void textout_centre_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, AL_CONST cha
     if (bg != -1) {
         int w = al_get_text_width(f->real, str);
         al_draw_filled_rectangle(x - w / 2, y, x + w - w / 2,
-            y + al_get_font_line_height(f->real), a4color(bg, current_depth));
+            y + al_get_font_line_height(f->real), a5color(bg, current_depth));
     }
-    al_draw_text(f->real, a4color(color, current_depth), x, y, ALLEGRO_ALIGN_CENTRE, str);
+    al_draw_text(f->real, a5color(color, current_depth), x, y, ALLEGRO_ALIGN_CENTRE, str);
 }
 
 void textout_right_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, AL_CONST char *str, int x, int y, int color, int bg){
@@ -502,9 +502,9 @@ void textout_right_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, AL_CONST char
     if (bg != -1) {
         int w = al_get_text_width(f->real, str);
         al_draw_filled_rectangle(x - w / 2, y, x + w - w / 2,
-            y + al_get_font_line_height(f->real), a4color(bg, current_depth));
+            y + al_get_font_line_height(f->real), a5color(bg, current_depth));
     }
-    al_draw_text(f->real, a4color(color, current_depth), x, y, ALLEGRO_ALIGN_RIGHT, str);
+    al_draw_text(f->real, a5color(color, current_depth), x, y, ALLEGRO_ALIGN_RIGHT, str);
 }
 
 void textprintf_right_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
@@ -529,9 +529,9 @@ void textout_ex(struct BITMAP *bmp, AL_CONST struct FONT *f, AL_CONST char *str,
     al_set_target_bitmap(bmp->real);
     if (bg != -1) {
         al_draw_filled_rectangle(x, y, x + al_get_text_width(f->real, str),
-            y + al_get_font_line_height(f->real), a4color(bg, current_depth));
+            y + al_get_font_line_height(f->real), a5color(bg, current_depth));
     }
-    al_draw_text(f->real, a4color(color, current_depth), x, y, 0, str);
+    al_draw_text(f->real, a5color(color, current_depth), x, y, 0, str);
 
     maybe_flip_screen(bmp);
 }
@@ -565,7 +565,7 @@ int makecol(int r, int g, int b){
 
 void clear_to_color(BITMAP *bitmap, int color){
     al_set_target_bitmap(bitmap->real);
-    al_clear_to_color(a4color(color, current_depth));
+    al_clear_to_color(a5color(color, current_depth));
 }
 
 void acquire_screen(){
@@ -674,7 +674,7 @@ void polygon3d_f(BITMAP * bitmap, int type, BITMAP * texture, int vc, V3D_f * vt
         a5_vertexes[index].z = 0;
         a5_vertexes[index].u = vtx[index]->u;
         a5_vertexes[index].v = vtx[index]->v;
-        a5_vertexes[index].color = a4color(color, current_depth);
+        a5_vertexes[index].color = a5color(color, current_depth);
         
         /*
         printf("%d: x %f y %f z %f u %f v %f\n",
@@ -914,7 +914,8 @@ void set_keyboard_rate(int delay, int repeat){
 }
 
 void get_executable_name(char *output, int size){
-    /* FIXME */
+    const char * name = al_get_app_name();
+    strncpy(output, name, size);
 }
 
 void set_config_int(AL_CONST char *section, AL_CONST char *name, int val){
