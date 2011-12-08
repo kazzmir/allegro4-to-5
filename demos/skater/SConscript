@@ -1,1 +1,9 @@
 Import('env')
+
+source = Split("""anim.c backscrl.c credits.c dblbuf.c fps.c
+framewk.c gamepad.c game_sk.c global.c intro.c kbd_sk.c level.c lvlalloc.c
+lvlfile.c lvlstate.c menuabt.c menu.c menuctl.c menugfx.c menumain.c menumisc.c
+menuopts.c menusnd.c menusucc.c music.c oglflip.c pageflip.c physics.c
+quadtree.c scrshot.c skater.c token.c transitn.c tribuf.c virtctl.c""")
+
+env.Program('skater', ['source/%s' % file for file in source])

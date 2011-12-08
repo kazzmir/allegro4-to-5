@@ -61,6 +61,79 @@ char *replace_filename(char *dest, AL_CONST char *path, AL_CONST char *filename,
    return dest;
 }
 
+char *append_filename(char *dest, AL_CONST char *path, AL_CONST char *filename, int size){
+    /* FIXME */
+    return NULL;
+}
+
+int pack_feof(PACKFILE * f){
+    /* FIXME */
+    return -1;
+}
+
+int pack_getc(PACKFILE *f){
+    /* FIXME */
+    return -1;
+}
+
+long pack_mgetl(PACKFILE *f){
+    /* FIXME */
+    return -1;
+}
+
+PACKFILE *pack_fopen(AL_CONST char *filename, AL_CONST char *mode){
+    /* FIXME */
+    return NULL;
+}
+
+int pack_fseek(PACKFILE *f, int offset){
+    /* FIXME */
+    return -1;
+}
+
+char *pack_fgets(char *p, int max, PACKFILE *f){
+    /* FIXME */
+    return NULL;
+}
+
+PACKFILE *pack_fclose_chunk(PACKFILE *f){
+    /* FIXME */
+    return NULL;
+}
+
+PACKFILE *pack_fopen_chunk(PACKFILE *f, int pack){
+    /* FIXME */
+    return NULL;
+}
+
+int pack_fclose(PACKFILE *f){
+    /* FIXME */
+    return -1;
+}
+
+/* FIXME */
+int file_exists(AL_CONST char *filename, int attrib, int *aret){
+    return -1;
+}
+
+int exists(AL_CONST char *filename){
+    /* FIXME */
+    return -1;
+}
+
+DATAFILE * find_datafile_object(AL_CONST DATAFILE *dat, AL_CONST char *objectname){
+    /* FIXME */
+    return NULL;
+}
+
+DATAFILE * load_datafile(AL_CONST char *filename){
+    /* FIXME */
+    return NULL;
+}
+
+void unload_datafile(DATAFILE *dat){
+    /* FIXME */
+}
 
 
 #if 0

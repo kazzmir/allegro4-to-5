@@ -16,8 +16,11 @@ int AL_RAND(){
 
 typedef struct {int keycode, unicode, modifiers;} KEYBUFFER_ENTRY;
 
+volatile long midi_pos;
+int gfx_capabilities;
 int * allegro_errno;
-int allegro_error;
+char allegro_id[] = "Allegro 4 to 5 Layer Version 0.1";
+char allegro_error[ALLEGRO_ERROR_SIZE];
 volatile char key[KEY_MAX];
 static volatile KEYBUFFER_ENTRY keybuffer[KEYBUFFER_LENGTH];
 static volatile int keybuffer_pos;
@@ -47,6 +50,9 @@ static ALLEGRO_CONFIG *current_config;
 static ALLEGRO_CONFIG **config_stack;
 static int config_stack_size;
 
+JOYSTICK_INFO joy[MAX_JOYSTICKS];
+int num_joysticks;
+
 PALETTE current_palette;
 
 RGB_MAP * rgb_map;
@@ -70,6 +76,7 @@ static int is_ok(int code){
     return -1;
 }
 
+/* FIXME: this should be renamed to a5color */
 static ALLEGRO_COLOR a4color(int color, int bit_depth){
     if (bit_depth == 8){
         RGB * rgb = &current_palette[color];
@@ -79,11 +86,22 @@ static ALLEGRO_COLOR a4color(int color, int bit_depth){
     return al_map_rgb(1, 1, 1);
 }
 
+/* FIXME: this should be renamed to a4color */
+static int make_color(ALLEGRO_COLOR color, int bit_depth){
+    unsigned char red, green, blue;
+    al_unmap_rgb(color, &red, &green, &blue);
+    return makecol_depth(bit_depth, red, green, blue);
+}
+
 int getr_depth(int color_depth, int c){
     ALLEGRO_COLOR color = a4color(c, color_depth);
     unsigned char red, green, blue;
     al_unmap_rgb(color, &red, &green, &blue);
     return red;
+}
+
+int getr(int color){
+    return getr_depth(current_depth, color);
 }
 
 int getg_depth(int color_depth, int c){
@@ -93,11 +111,19 @@ int getg_depth(int color_depth, int c){
     return green;
 }
 
+int getg(int color){
+    return getg_depth(current_depth, color);
+}
+
 int getb_depth(int color_depth, int c){
     ALLEGRO_COLOR color = a4color(c, color_depth);
     unsigned char red, green, blue;
     al_unmap_rgb(color, &red, &green, &blue);
     return blue;
+}
+
+int getb(int color){
+    return getb_depth(current_depth, color);
 }
 
 int bitmap_mask_color(BITMAP *b){
@@ -183,6 +209,10 @@ static BITMAP * create_bitmap_from(ALLEGRO_BITMAP * real){
 
 BITMAP * load_bitmap(const char * path,struct RGB *pal){
     return create_bitmap_from(al_load_bitmap(path));
+}
+
+struct BITMAP * load_bmp(AL_CONST char *filename, struct RGB *pal){
+    return load_bitmap(filename, pal);
 }
 
 void destroy_bitmap(BITMAP* bitmap){
@@ -345,7 +375,11 @@ static void start_key_thread(){
     }
 }
 
-int allegro_init(){
+int install_allegro(int system_id, int *errno_ptr, int (*atexit_ptr)(void (*func)(void))){
+    return _install_allegro_version_check(system_id, errno_ptr, atexit_ptr, 0);
+}
+
+int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_ptr)(void (*func)(void)), int version){
     int index;
     ALLEGRO_PATH *path;
     allegro_errno = &allegro_error;
@@ -392,6 +426,11 @@ void triangle(BITMAP * buffer, int x1, int y1, int x2, int y2, int x3, int y3, i
     al_draw_filled_triangle(x1, y1, x2, y2, x3, y3, a4color(color, current_depth));
 }
 
+int getpixel(BITMAP * buffer, int x, int y){
+    ALLEGRO_BITMAP * al_buffer = buffer->real;
+    return make_color(al_get_pixel(al_buffer, x, y), current_depth);
+}
+
 void putpixel(BITMAP * buffer, int x, int y, int color){
     ALLEGRO_BITMAP * al_buffer = buffer->real;
     al_set_target_bitmap(al_buffer);
@@ -400,6 +439,10 @@ void putpixel(BITMAP * buffer, int x, int y, int color){
 
 void set_palette(const PALETTE palette){
     memcpy(current_palette, palette, sizeof(PALETTE));
+}
+
+void get_palette(PALETTE palette){
+    memcpy(palette, current_palette, sizeof(PALETTE));
 }
 
 static void maybe_flip_screen(BITMAP * where){
@@ -761,4 +804,204 @@ int get_config_int(char const *section, char const *name, int def){
 
 unsigned int _default_ds(){
     return 0;
+}
+
+int request_video_bitmap(struct BITMAP *bitmap){
+    /* FIXME */
+    return -1;
+}
+
+int poll_scroll(){
+    return -1;
+}
+
+BITMAP * create_video_bitmap(int width, int height){
+    return create_bitmap(width, height);
+}
+
+int enable_triple_buffer(){
+    /* FIXME */
+    return -1;
+}
+
+int save_bitmap(AL_CONST char *filename, struct BITMAP *bmp, AL_CONST struct RGB *pal){
+    /* FIXME */
+    return -1;
+}
+
+int is_video_bitmap(BITMAP * what){
+    /* All bitmaps are video */
+    return 1;
+}
+
+void rotate_scaled_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y, fixed angle, fixed scale){
+    /* FIXME */
+}
+
+void rotate_scaled_sprite_v_flip(BITMAP *bmp, BITMAP *sprite, int x, int y, fixed angle, fixed scale){
+    /* FIXME */
+}
+
+void solid_mode(){
+    /* FIXME */
+}
+
+void drawing_mode(int mode, struct BITMAP *pattern, int x_anchor, int y_anchor){
+    /* FIXME */
+}
+
+void quad3d(struct BITMAP *bmp, int type, struct BITMAP *texture, V3D *v1, V3D *v2, V3D *v3, V3D *v4){
+    /* FIXME */
+}
+
+int show_video_bitmap(BITMAP *bitmap){
+    /* FIXME */
+    return -1;
+}
+
+int play_sample(AL_CONST SAMPLE * sample, int volume, int pan, int frequency, int loop){
+    /* FIXME */
+    return -1;
+}
+
+void stop_midi(){
+    /* FIXME */
+}
+
+int play_midi(MIDI *midi, int loop){
+    /* FIXME */
+    return -1;
+}
+
+void set_volume(int digi_volume, int midi_volume){
+    /* FIXME */
+}
+
+int text_length(AL_CONST struct FONT *f, AL_CONST char *str){
+    /* FIXME */
+    return -1;
+}
+
+int text_height(AL_CONST struct FONT *f){
+    /* FIXME */
+    return -1;
+}
+
+int MIN(int a, int b){
+    return a < b ? a : b;
+}
+
+int MAX(int a, int b){
+    return a > b ? a : b;
+}
+
+int MID(int x, int y, int z){
+    return ((x) > (y) ? ((y) > (z) ? (y) : ((x) > (z) ?
+                                            (z) : (x))) : ((y) > (z) ? ((z) > (x) ? (z) :
+                                                                        (x)): (y)));
+}
+
+void vline(struct BITMAP *bmp, int x, int y_1, int y2, int color){
+    /* FIXME */
+}
+
+void hline(struct BITMAP *bmp, int x1, int y, int x2, int color){
+    /* FIXME */
+}
+
+void set_keyboard_rate(int delay, int repeat){
+    /* FIXME */
+}
+
+void get_executable_name(char *output, int size){
+    /* FIXME */
+}
+
+void set_config_int(AL_CONST char *section, AL_CONST char *name, int val){
+    /* FIXME */
+}
+
+int show_os_cursor(int cursor){
+    /* FIXME */
+    return -1;
+}
+
+int desktop_color_depth(void){
+    /* FIXME */
+    return -1;
+}
+
+void voice_start(int voice){
+    /* FIXME */
+}
+
+void voice_set_volume(int voice, int volume){
+    /* FIXME */
+}
+
+void voice_set_playmode(int voice, int playmode){
+    /* FIXME */
+}
+
+int allocate_voice(AL_CONST SAMPLE *spl){
+    /* FIXME */
+    return -1;
+}
+
+void deallocate_voice(int voice){
+    /* FIXME */
+}
+
+void voice_stop(int voice){
+    /* FIXME */
+}
+
+int poll_joystick(void){
+    /* FIXME */
+    return 0;
+}
+
+void remove_int(void (*proc)(void)){
+    /* FIXME */
+}
+
+void release_bitmap(BITMAP * bitmap){
+    /* FIXME */
+}
+
+void acquire_bitmap(BITMAP * bitmap){
+    /* FIXME */
+}
+
+int install_joystick(int type){
+    /* FIXME */
+    return -1;
+}
+
+int set_display_switch_mode(int mode){
+    /* FIXME */
+    return -1;
+}
+
+int install_sound(int digi, int midi, AL_CONST char *cfg_path){
+    /* FIXME */
+    return -1;
+}
+
+int set_close_button_callback(void (*proc)(void)){
+    /* FIXME */
+    return -1;
+}
+
+void set_window_title(AL_CONST char *name){
+    /* FIXME */
+}
+
+int stricmp(AL_CONST char *s1, AL_CONST char *s2){
+    /* FIXME */
+    return -1;
+}
+
+void release_voice(int voice){
+    /* FIXME */
 }

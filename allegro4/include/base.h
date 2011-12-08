@@ -23,11 +23,16 @@
 #define AL_ID(a,b,c,d)     (((a)<<24) | ((b)<<16) | ((c)<<8) | (d))
 #define ZERO_SIZE_ARRAY(type, name)  type name[]
 #define LOCK_FUNCTION(_)
+#define LOCK_VARIABLE(_)
 #define END_OF_FUNCTION(_)
 
-#define MAX(x,y)     (((x) > (y)) ? (x) : (y))
-
 extern int * allegro_errno;
+
+#ifndef ALLEGRO_VERSION
+#define ALLEGRO_VERSION 4
+#define ALLEGRO_SUB_VERSION 4
+#define ALLEGRO_WIP_VERSION 0
+#endif
 
 #define ALLEGRO_NO_ASM
 

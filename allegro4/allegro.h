@@ -1,6 +1,10 @@
 #ifndef ALLEGRO_H
 #define ALLEGRO_H
 
+/* FIXME: not sure if stdlib belongs here */
+#include <stdlib.h>
+
+#include "include/base.h"
 #include "include/gfx.h"
 #include "include/draw.h"
 #include "include/fix.h"
@@ -8,6 +12,7 @@
 #include "include/palette.h"
 #include "include/text.h"
 #include "include/keyboard.h"
+#include "include/joystick.h"
 #include "include/mouse.h"
 #include "include/3dmaths.h"
 #include "include/3d.h"
@@ -23,6 +28,7 @@
 #include "include/config.h"
 #include "include/rle.h"
 #include "include/compiled.h"
+#include "include/system.h"
 
 #ifdef __cplusplus
    extern "C" {
@@ -31,11 +37,6 @@
 // typedef struct BITMAP BITMAP;
 extern int * palette_color;
 extern BITMAP* screen;
-
-extern int allegro_error;
-
-int allegro_init();
-void allegro_message(char const *format, ...);
 
 #define END_OF_MAIN()
 

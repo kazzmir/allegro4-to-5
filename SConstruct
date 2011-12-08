@@ -7,7 +7,7 @@ def defaultEnvironment():
 
 def allegro4Environment():
     env = defaultEnvironment()
-    env.ParseConfig('pkg-config allegro-5.1 allegro_primitives-5.1 allegro_image-5.1 allegro_font-5.1 --cflags --libs')
+    env.ParseConfig('pkg-config allegro-5.1 allegro_primitives-5.1 allegro_image-5.1 allegro_font-5.1 --libs')
     env.Prepend(LIBS = [allegroLibrary(), 'm'])
     # env.Prepend(LIBS = [allegroLibrary()])
     env.Append(CPPPATH = ['#allegro4'])

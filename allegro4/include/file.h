@@ -84,6 +84,8 @@ AL_FUNC(void, al_findclose, (struct al_ffblk *info));
 #define PACKFILE_FLAG_OLD_CRYPT  32    /* backward compatibility mode */
 #define PACKFILE_FLAG_EXEDAT     64    /* reading from our executable */
 
+#define FA_NONE 0
+#define FA_ALL (~FA_NONE)
 
 typedef struct PACKFILE_VTABLE PACKFILE_VTABLE;
 typedef struct PACKFILE PACKFILE;
