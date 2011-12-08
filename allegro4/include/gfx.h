@@ -288,6 +288,7 @@ typedef struct BITMAP            /* a bitmap structure */
    int y_ofs;                    /* vertical offset (for sub-bitmaps) */
    int seg;                      /* bitmap segment */
    unsigned char **line;
+   int depth;
 } BITMAP;
 
 

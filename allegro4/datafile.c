@@ -227,6 +227,8 @@ static BITMAP *read_bitmap(PACKFILE *f, int bits, int allowconv)
       blit(tmp, bmp, 0, 0, 0, 0, bmp->w, bmp->h);
       destroy_bitmap(tmp);
    }
+   
+   a4_fix_bitmap(bmp, current_palette);
 
    return bmp;
 }

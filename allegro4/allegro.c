@@ -228,29 +228,36 @@ void create_rgb_table(RGB_MAP *table, AL_CONST PALETTE pal, AL_METHOD(void, call
 void create_light_table(COLOR_MAP *table, AL_CONST PALETTE pal, int r, int g, int b, AL_METHOD(void, callback, (int pos))){
 }
 
-static BITMAP * create_bitmap_from(ALLEGRO_BITMAP * real){
+static BITMAP * create_bitmap_from(ALLEGRO_BITMAP * real, int depth){
     int i;
     BITMAP * bitmap = malloc(sizeof(BITMAP));
     bitmap->real = real;
     bitmap->w = al_get_bitmap_width(real);
     bitmap->h = al_get_bitmap_height(real);
+    bitmap->depth = depth;
     
+    int size = (depth + 7) / 8;
     /* always use 32-bit RGBA for dat? */
-    bitmap->dat = al_malloc(bitmap->w * bitmap->h * 4);
+    bitmap->dat = al_malloc(bitmap->w * bitmap->h * size);
     bitmap->line = al_malloc(bitmap->h * sizeof *bitmap->line);
     for (i = 0; i < bitmap->h; i++) {
-        bitmap->line[i] = bitmap->dat + i * 4 * bitmap->w;
+        bitmap->line[i] = bitmap->dat;
+        bitmap->line[i] += i * size * bitmap->w;
     }
 
     return bitmap;
 }
 
+BITMAP * create_bitmap_ex(int depth, int width, int height){
+    return create_bitmap_from(al_create_bitmap(width, height), depth);
+}
+
 BITMAP * create_bitmap(int width, int height){
-    return create_bitmap_from(al_create_bitmap(width, height));
+    return create_bitmap_ex(current_depth, width, height);
 }
 
 BITMAP * load_bitmap(const char * path,struct RGB *pal){
-    return create_bitmap_from(al_load_bitmap(path));
+    return create_bitmap_from(al_load_bitmap(path), current_depth);
 }
 
 struct BITMAP * load_bmp(AL_CONST char *filename, struct RGB *pal){
@@ -285,7 +292,7 @@ void set_color_conversion(int mode){
 int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualheight){
     int i;
     display = al_create_display(width, height);
-    screen = create_bitmap_from(al_get_backbuffer(display));
+    screen = create_bitmap_from(al_get_backbuffer(display), 32);
     palette_color = palette_color8;
     set_palette(default_palette);
     setup_default_driver(screen);
@@ -312,8 +319,27 @@ void allegro_message(char const *format, ...){
     va_end(args);
 }
 
-BITMAP * create_bitmap_ex(int depth, int width, int height){
-    return create_bitmap(width, height);
+void a4_fix_bitmap(BITMAP *bitmap, PALETTE palette){
+    ALLEGRO_LOCKED_REGION *lock = al_lock_bitmap(bitmap->real,
+        ALLEGRO_PIXEL_FORMAT_ABGR_8888_LE, ALLEGRO_LOCK_WRITEONLY);
+    char *rgba = lock->data;
+    if (bitmap->depth == 8){
+        int x, y;
+        for (y = 0; y < bitmap->h; y++){
+            for (x = 0; x < bitmap->w; x++){
+                int c = *(bitmap->line[y] + x);
+                char red = palette[c].r;
+                char green = palette[c].g;
+                char blue = palette[c].b;
+                char alpha = 255;
+                rgba[y * lock->pitch + x * 4 + 0] = red;
+                rgba[y * lock->pitch + x * 4 + 1] = green;
+                rgba[y * lock->pitch + x * 4 + 2] = blue;
+                rgba[y * lock->pitch + x * 4 + 3] = alpha;
+            }
+        }
+    }
+    al_unlock_bitmap(bitmap->real);
 }
 
 void install_timer(){

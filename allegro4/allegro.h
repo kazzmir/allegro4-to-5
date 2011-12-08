@@ -64,6 +64,7 @@ extern PALETTE current_palette;
 extern int current_depth;
 
 unsigned int _default_ds();
+void a4_fix_bitmap(BITMAP *bitmap, PALETTE palette);
 
 #define END_OF_MAIN()
 
