@@ -62,6 +62,9 @@ def demos():
     env = allegro4Environment()
     SConscript('demos/SConscript', variant_dir = 'build/demos', exports = ['env'])
 
+def gui():
+    return makeExample('exgui', ['exgui.c'])
+
 stars()
 shade()
 bitmap()
@@ -71,3 +74,4 @@ mouse()
 config()
 data()
 demos()
+gui()

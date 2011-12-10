@@ -29,6 +29,7 @@
 #include "include/rle.h"
 #include "include/compiled.h"
 #include "include/system.h"
+#include "include/timer.h"
 
 #ifdef __cplusplus
    extern "C" {
@@ -56,6 +57,8 @@
 #define SGN(x)       (((x) >= 0) ? 1 : -1)
 
 #define _color_depth current_depth
+
+#define _mouse_screen screen
 
 // typedef struct BITMAP BITMAP;
 extern int * palette_color;

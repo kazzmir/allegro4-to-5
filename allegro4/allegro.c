@@ -56,6 +56,8 @@ static int cursor_x, cursor_y;
 static ALLEGRO_CONFIG *current_config;
 static ALLEGRO_CONFIG **config_stack;
 static int config_stack_size;
+int _gfx_mode_set_count;
+int _allegro_count;
 
 JOYSTICK_INFO joy[MAX_JOYSTICKS];
 int num_joysticks;
@@ -211,7 +213,20 @@ void clear_keybuf(){
     keybuffer_pos = 0;
 }
 
-void rest(int milliseconds){
+void simulate_keypress(int k){
+    if (keybuffer_pos < KEYBUFFER_LENGTH) {
+        keybuffer[keybuffer_pos].unicode = k & 255;
+        keybuffer[keybuffer_pos].keycode = k >> 8;
+        keybuffer[keybuffer_pos].modifiers = 0;
+        keybuffer_pos++;
+    }
+}
+
+void rest(unsigned int milliseconds){
+    al_rest(milliseconds / 1000.0);
+}
+
+void rest_callback(unsigned int milliseconds, void (*callback)()){
     al_rest(milliseconds / 1000.0);
 }
 
@@ -219,6 +234,15 @@ void vsync(){
 }
 
 void show_mouse(struct BITMAP *bmp){
+}
+
+void scare_mouse(void){
+}
+
+void unscare_mouse(void){
+}
+
+void scare_mouse_area(int x, int y, int w, int h){
 }
 
 void set_trans_blender(int r, int g, int b, int a){
@@ -329,6 +353,11 @@ void destroy_bitmap(BITMAP* bitmap){
     al_free(bitmap);
 }
 
+int is_same_bitmap(BITMAP *b1, BITMAP *b2){
+    if (!b1 || !b2) return 0;
+    return b1->real == b2->real;
+}
+
 int poll_keyboard(){
     return 0;
 }
@@ -359,6 +388,7 @@ int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualh
     for (i = 0; i < 256; i++){
         palette_color8[i] = i;
     }
+    _gfx_mode_set_count++;
     return is_ok(display != NULL);
 }
 
@@ -380,7 +410,8 @@ void allegro_message(char const *format, ...){
     va_end(args);
 }
 
-void install_timer(){
+int install_timer(){
+    return 0;
 }
 
 int install_mouse(){
@@ -409,6 +440,10 @@ static int a5key(int a4key){
 
 char const *scancode_to_name(int scancode){
     return al_keycode_to_name(a5key(scancode));
+}
+
+int scancode_to_ascii(int scancode){
+    return '?';
 }
 
 static int is_shift(int key){
@@ -502,6 +537,8 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     al_set_path_filename(path, "a4_font.tga");
     font->real = al_load_font(al_path_cstr(path, '/'), 0, 0);
     al_destroy_path(path);
+    
+    _allegro_count++;
 
     return is_ok(ok);
 }
@@ -509,6 +546,11 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
 void circle(BITMAP * buffer, int x, int y, int radius, int color){
     al_set_target_bitmap(buffer->real);
     al_draw_circle(x, y, radius, a5color(color, current_depth), 1);
+}
+
+void circlefill(BITMAP * buffer, int x, int y, int radius, int color){
+    al_set_target_bitmap(buffer->real);
+    al_draw_filled_circle(x, y, radius, a5color(color, current_depth));
 }
 
 void rect(BITMAP * buffer, int x1, int y1, int x2, int y2, int color){
@@ -677,6 +719,10 @@ void set_clip_rect(BITMAP * bitmap, int x1, int y1, int x2, int y2){
     al_set_clipping_rectangle(x1, y1, x2 - x1, y2 - y1);
 }
 
+void set_clip_state(BITMAP * bitmap, int onoff){
+
+}
+
 int bitmap_color_depth(BITMAP * bitmap){
     /* FIXME: return the depth of the bitmap */
     return current_depth;
@@ -821,12 +867,6 @@ void polygon3d_f(BITMAP * bitmap, int type, BITMAP * texture, int vc, V3D_f * vt
     free(a5_vertexes);
 }
 
-/* Convert A5 times (given as a double) to a long by multiplying by 1000 */
-#define TIMERS_PER_SECOND     1193181L
-long BPS_TO_TIMER(long time){
-    return ALLEGRO_BPS_TO_SECS(time) * 1000;
-}
-
 struct timer_stuff{
     long speed;
     void (*callback)();
@@ -864,6 +904,10 @@ int install_int_ex(void (*proc)(void), long speed){
         return 0;
     }
     return -1;
+}
+
+int install_int(void (*proc)(void), long speed){
+    return install_int_ex(proc, MSEC_TO_TIMER(speed));
 }
 
 void push_config_state(){
@@ -1154,4 +1198,15 @@ COMPILED_SPRITE *get_compiled_sprite(BITMAP *bitmap, int planar){
 
 void *_al_sane_realloc(void *ptr, size_t size){
     return al_realloc(ptr, size);
+}
+
+int set_display_switch_callback(int dir, void (*cb)()){
+    return 0;
+}
+
+int get_display_switch_mode(){
+    return SWITCH_BACKGROUND;
+}
+
+void remove_display_switch_callback(void (*cb)()){
 }
