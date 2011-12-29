@@ -33,10 +33,8 @@ char the_text[] =
 /* for the multiple selection list */
 char sel[11];
 
-#if 0
 /* for the example bitmap */
 DATAFILE *datafile;
-#endif
 
 
 /* callback function to specify the contents of the listbox */
@@ -322,7 +320,7 @@ int main(int argc, char *argv[])
 
    /* load the datafile */
    replace_filename(buf, argv[0], "example.dat", sizeof(buf));
-#if 0
+
    datafile = load_datafile(buf);
    if (!datafile) {
       set_gfx_mode(GFX_TEXT, 0, 0, 0, 0);
@@ -331,7 +329,6 @@ int main(int argc, char *argv[])
    }
 
    set_palette(datafile[THE_PALETTE].dat);
-#endif
 
    /* set up colors */
    gui_fg_color = makecol(0, 0, 0);
@@ -350,11 +347,9 @@ int main(int argc, char *argv[])
       }
    }
    
-#if 0
    /* fill in bitmap pointers */
    the_dialog[BITMAP_OBJECT].dp = datafile[SILLY_BITMAP].dat;
    the_dialog[ICON_OBJECT].dp = datafile[SILLY_BITMAP].dat;
-#endif
    
    /* shift the dialog 2 pixels away from the border */
    position_dialog(the_dialog, 2, 2);
@@ -362,9 +357,7 @@ int main(int argc, char *argv[])
    /* do the dialog */
    do_dialog(the_dialog, -1);
 
-#if 0
    unload_datafile(datafile);
-#endif
    
    return 0;
 }

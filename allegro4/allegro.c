@@ -622,17 +622,17 @@ void stretch_blit(BITMAP *source, BITMAP *dest, int source_x,
     ALLEGRO_BITMAP * al_to = dest->real;
      /* A4 allows drawing a bitmap to itself, A5 does not. */
      if (al_from == al_to) {
-        ALLEGRO_BITMAP *temp = al_create_bitmap(source_width, source_height);
+         ALLEGRO_BITMAP *temp = al_create_bitmap(source_width, source_height);
          al_set_target_bitmap(temp);
-        al_draw_bitmap(al_from, -source_x, -source_y, 0);
+         al_draw_bitmap(al_from, -source_x, -source_y, 0);
          al_set_target_bitmap(al_to);
-        al_draw_scaled_bitmap(temp, 0, 0, source_width,
-            source_height, dest_x, dest_y, dest_width, dest_height, 0);
+         al_draw_scaled_bitmap(temp, 0, 0, source_width,
+             source_height, dest_x, dest_y, dest_width, dest_height, 0);
          al_destroy_bitmap(temp);
      } else {
          al_set_target_bitmap(al_to);
-        al_draw_scaled_bitmap(al_from, source_x, source_y, source_width,
-            source_height, dest_x, dest_y, dest_width, dest_height, 0);
+         al_draw_scaled_bitmap(al_from, source_x, source_y, source_width,
+             source_height, dest_x, dest_y, dest_width, dest_height, 0);
      }
  
     maybe_flip_screen(dest);
@@ -745,11 +745,13 @@ void clear_to_color(BITMAP *bitmap, int color){
 }
 
 void acquire_screen(){
-    acquire_bitmap(screen);
+    // Makes e.g. ex_mouse fail because parts of the screen are drawn without
+    // it being acquired.
+    //acquire_bitmap(screen);
 }
 
 void release_screen(){
-    release_bitmap(screen);
+    //release_bitmap(screen);
 }
 
 fixed fixmul(fixed x, fixed y){
