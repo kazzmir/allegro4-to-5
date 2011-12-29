@@ -543,44 +543,49 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     return is_ok(ok);
 }
 
+static void draw_into(BITMAP *bitmap){
+    lazily_create_real_bitmap(bitmap, 0);
+    al_set_target_bitmap(bitmap->real);
+}
+
 void circle(BITMAP * buffer, int x, int y, int radius, int color){
-    al_set_target_bitmap(buffer->real);
+    draw_into(buffer);
     al_draw_circle(x, y, radius, a5color(color, current_depth), 1);
 }
 
 void circlefill(BITMAP * buffer, int x, int y, int radius, int color){
-    al_set_target_bitmap(buffer->real);
+    draw_into(buffer);
     al_draw_filled_circle(x, y, radius, a5color(color, current_depth));
 }
 
 void rect(BITMAP * buffer, int x1, int y1, int x2, int y2, int color){
-    al_set_target_bitmap(buffer->real);
+    draw_into(buffer);
     al_draw_rectangle(x1, y1, x2+1, y2+1, a5color(color, current_depth), 1);
 }
 
 void rectfill(BITMAP * buffer, int x1, int y1, int x2, int y2, int color){
-    al_set_target_bitmap(buffer->real);
+    draw_into(buffer);
     al_draw_filled_rectangle(x1, y1, x2+1, y2+1, a5color(color, current_depth));
 }
 
 void triangle(BITMAP * buffer, int x1, int y1, int x2, int y2, int x3, int y3, int color){
-    al_set_target_bitmap(buffer->real);
+    draw_into(buffer);
     al_draw_filled_triangle(x1, y1, x2, y2, x3, y3, a5color(color, current_depth));
 }
 
 int getpixel(BITMAP * buffer, int x, int y){
+    lazily_create_real_bitmap(buffer, 0);
     ALLEGRO_BITMAP * al_buffer = buffer->real;
     return a4color(al_get_pixel(al_buffer, x, y), current_depth);
 }
 
 void putpixel(BITMAP * buffer, int x, int y, int color){
-    ALLEGRO_BITMAP * al_buffer = buffer->real;
-    al_set_target_bitmap(al_buffer);
+    draw_into(buffer);
     al_put_pixel(x, y, a5color(color, current_depth));
 }
 
 void line(BITMAP * buffer, int x, int y, int x2, int y2, int color){
-    al_set_target_bitmap(buffer->real);
+    draw_into(buffer);
     al_draw_line(x, y, x2, y2, a5color(color, current_depth), 1);
 }
 
@@ -611,6 +616,7 @@ void stretch_blit(BITMAP *source, BITMAP *dest, int source_x,
     int dest_y, int dest_width, int dest_height){
         
     lazily_create_real_bitmap(source, 0);
+    lazily_create_real_bitmap(dest, 0);
         
     ALLEGRO_BITMAP * al_from = source->real;
     ALLEGRO_BITMAP * al_to = dest->real;
@@ -691,7 +697,7 @@ void textprintf_centre_ex(struct BITMAP *bmp, struct FONT *f, int x, int y, int 
 
 void textout_ex(struct BITMAP *bmp, struct FONT *f, AL_CONST char *str, int x, int y, int color, int bg){
     lazily_create_real_font(f);
-    al_set_target_bitmap(bmp->real);
+    draw_into(bmp);
     if (bg != -1) {
         al_draw_filled_rectangle(x, y, x + al_get_text_width(f->real, str),
             y + al_get_font_line_height(f->real), a5color(bg, current_depth));
@@ -702,7 +708,7 @@ void textout_ex(struct BITMAP *bmp, struct FONT *f, AL_CONST char *str, int x, i
 }
 
 void draw_gouraud_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y, int c1, int c2, int c3, int c4){
-    al_set_target_bitmap(bmp->real);
+    draw_into(bmp);
     al_draw_bitmap(sprite->real, x, y, 0);
 }
 
@@ -715,6 +721,7 @@ int makecol_depth(int depth, int r, int g, int b){
 }
 
 void set_clip_rect(BITMAP * bitmap, int x1, int y1, int x2, int y2){
+    lazily_create_real_bitmap(bitmap, 0);
     al_set_target_bitmap(bitmap->real);
     al_set_clipping_rectangle(x1, y1, x2 - x1, y2 - y1);
 }
@@ -733,14 +740,16 @@ int makecol(int r, int g, int b){
 }
 
 void clear_to_color(BITMAP *bitmap, int color){
-    al_set_target_bitmap(bitmap->real);
+    draw_into(bitmap);
     al_clear_to_color(a5color(color, current_depth));
 }
 
 void acquire_screen(){
+    acquire_bitmap(screen);
 }
 
 void release_screen(){
+    release_bitmap(screen);
 }
 
 fixed fixmul(fixed x, fixed y){
@@ -1131,11 +1140,11 @@ void remove_int(void (*proc)(void)){
 }
 
 void release_bitmap(BITMAP * bitmap){
-    /* FIXME */
+    al_unlock_bitmap(bitmap->real);
 }
 
 void acquire_bitmap(BITMAP * bitmap){
-    /* FIXME */
+    al_lock_bitmap(bitmap->real, ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_READWRITE);
 }
 
 int install_joystick(int type){
