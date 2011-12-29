@@ -461,6 +461,31 @@ AL_FUNC(void, remove_display_switch_callback, (AL_METHOD(void, cb, (void))));
 
 AL_FUNC(void, lock_bitmap, (struct BITMAP *bmp));
 
+AL_FUNC(uintptr_t, bmp_write_line, (BITMAP *bmp, int lyne));
+AL_FUNC(uintptr_t, bmp_read_line, (BITMAP *bmp, int lyne));
+AL_FUNC(void, bmp_unwrite_line, (BITMAP *bmp));
+AL_FUNC(int, is_windowed_mode, (void));
+AL_FUNC(void, clear_to_color, (BITMAP *bitmap, int color));
+AL_FUNC(int, bitmap_color_depth, (BITMAP *bmp));
+AL_FUNC(int, bitmap_mask_color, (BITMAP *bmp));
+AL_FUNC(int, is_same_bitmap, (BITMAP *bmp1, BITMAP *bmp2));
+AL_FUNC(int, is_linear_bitmap, (BITMAP *bmp));
+AL_FUNC(int, is_planar_bitmap, (BITMAP *bmp));
+AL_FUNC(int, is_memory_bitmap, (BITMAP *bmp));
+AL_FUNC(int, is_screen_bitmap, (BITMAP *bmp));
+AL_FUNC(int, is_video_bitmap, (BITMAP *bmp));
+AL_FUNC(int, is_system_bitmap, (BITMAP *bmp));
+AL_FUNC(int, is_sub_bitmap, (BITMAP *bmp));
+AL_FUNC(void, acquire_bitmap, (BITMAP *bmp));
+AL_FUNC(void, release_bitmap, (BITMAP *bmp));
+AL_FUNC(void, acquire_screen, (void));
+AL_FUNC(void, release_screen, (void));
+AL_FUNC(int, is_inside_bitmap, (BITMAP *bmp, int x, int y, int clip));
+AL_FUNC(void, get_clip_rect, (BITMAP *bitmap, int *x1, int *y_1, int *x2, int *y2));
+AL_FUNC(void, set_clip_state, (BITMAP *bitmap, int state));
+AL_FUNC(int, get_clip_state, (BITMAP *bitmap));
+
+
 #ifdef __cplusplus
    }
 #endif
