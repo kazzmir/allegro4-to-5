@@ -1,13 +1,20 @@
 import os
 
+debug = ARGUMENTS.get("debug", "")
+
 def defaultEnvironment():
     env = Environment(ENV = os.environ)
     env.Append(CCFLAGS = ['-g3', '-Wall'])
     return env
 
 def allegro4Environment():
+    allegro_libs = ["allegro", "allegro_primitives", "allegro_image", "allegro_font"]
+    allegro_version = "5.1"
     env = defaultEnvironment()
-    env.ParseConfig('pkg-config allegro-5.1 allegro_primitives-5.1 allegro_image-5.1 allegro_font-5.1 --libs')
+    if debug:
+        env.ParseConfig("pkg-config " + " ".join([l + "-debug-" + allegro_version for l in allegro_libs]) + " --libs")
+    else:
+        env.ParseConfig("pkg-config " + " ".join([l + "-" + allegro_version for l in allegro_libs]) + " --libs")
     env.Prepend(LIBS = [allegroLibrary(), 'm'])
     # env.Prepend(LIBS = [allegroLibrary()])
     env.Append(CPPPATH = ['#allegro4'])
