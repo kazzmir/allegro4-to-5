@@ -1057,8 +1057,8 @@ void quad3d(struct BITMAP *bmp, int type, struct BITMAP *texture, V3D *v1, V3D *
 }
 
 int show_video_bitmap(BITMAP *bitmap){
-    /* FIXME */
-    return -1;
+    blit(bitmap, screen, 0, 0, 0, 0, bitmap->w, bitmap->h);
+    return 0;
 }
 
 int play_sample(AL_CONST SAMPLE * sample, int volume, int pan, int frequency, int loop){
@@ -1146,6 +1146,7 @@ void release_bitmap(BITMAP * bitmap){
 }
 
 void acquire_bitmap(BITMAP * bitmap){
+    lazily_create_real_bitmap(bitmap, 0);
     al_lock_bitmap(bitmap->real, ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_READWRITE);
 }
 

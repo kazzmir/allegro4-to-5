@@ -1,4 +1,4 @@
-import os
+import os, glob, re
 
 debug = ARGUMENTS.get("debug", "")
 
@@ -47,38 +47,15 @@ def stars():
 def shade():
     return makeExample('exshade', ['exshade.c'])
 
-def bitmap():
-    return makeExample('exbitmap', ['exbitmap.c'])
-
-def keys():
-    return makeExample('exkeys', ['exkeys.c'])
-
-def camera():
-    return makeExample('excamera', ['excamera.c'])
-
-def mouse():
-    return makeExample('exmouse', ['exmouse.c'])
-
-def config():
-    return makeExample('exconfig', ['exconfig.c'])
-
-def data():
-    return makeExample('exdata', ['exdata.c'])
 
 def demos():
     env = allegro4Environment()
     SConscript('demos/SConscript', variant_dir = 'build/demos', exports = ['env'])
 
-def gui():
-    return makeExample('exgui', ['exgui.c'])
 
-stars()
-shade()
-bitmap()
-keys()
-camera()
-mouse()
-config()
-data()
+examples = glob.glob("examples/*.c")
+for example in examples:
+    name = re.sub(r"examples/(.*?)\.c", r"\1", example)
+    makeExample(name, [name + ".c"])
+
 demos()
-gui()
