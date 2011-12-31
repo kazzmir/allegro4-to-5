@@ -745,13 +745,11 @@ void clear_to_color(BITMAP *bitmap, int color){
 }
 
 void acquire_screen(){
-    // Makes e.g. ex_mouse fail because parts of the screen are drawn without
-    // it being acquired.
-    //acquire_bitmap(screen);
+
 }
 
 void release_screen(){
-    //release_bitmap(screen);
+
 }
 
 fixed fixmul(fixed x, fixed y){
@@ -1142,12 +1140,13 @@ void remove_int(void (*proc)(void)){
 }
 
 void release_bitmap(BITMAP * bitmap){
-    al_unlock_bitmap(bitmap->real);
 }
 
 void acquire_bitmap(BITMAP * bitmap){
-    lazily_create_real_bitmap(bitmap, 0);
-    al_lock_bitmap(bitmap->real, ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_READWRITE);
+    /* We can't do anything here as it does some quite special things in A4.
+     * E.g. under DirectX it's required in order to use HW accel, sometimes
+     * it just speeds up putpixel, ...
+     */
 }
 
 int install_joystick(int type){
