@@ -20,6 +20,7 @@ typedef struct {int keycode, unicode, modifiers;} KEYBUFFER_ENTRY;
 
 volatile long midi_pos;
 int gfx_capabilities;
+volatile int retrace_count;
 
 int _allegro_errno;
 int * allegro_errno = &_allegro_errno;
@@ -58,6 +59,7 @@ static ALLEGRO_CONFIG **config_stack;
 static int config_stack_size;
 int _gfx_mode_set_count;
 int _allegro_count;
+static bool write_alpha;
 
 JOYSTICK_INFO joy[MAX_JOYSTICKS];
 int num_joysticks;
@@ -452,9 +454,11 @@ static int is_shift(int key){
 }
 
 static void * read_keys(ALLEGRO_THREAD * self, void * arg){
+
     ALLEGRO_EVENT_QUEUE * queue = al_create_event_queue();
     al_register_event_source(queue, al_get_keyboard_event_source());
     al_register_event_source(queue, al_get_mouse_event_source());
+
     while (true){
         ALLEGRO_EVENT event;
         al_wait_for_event(queue, &event);
@@ -502,12 +506,40 @@ static void * read_keys(ALLEGRO_THREAD * self, void * arg){
     return NULL;
 }
 
+static void *system_thread(ALLEGRO_THREAD * self, void * arg){
+
+    ALLEGRO_EVENT_QUEUE * queue = al_create_event_queue();
+
+    ALLEGRO_TIMER *timer = al_create_timer(1.0 / 60);
+    al_start_timer(timer);
+    al_register_event_source(queue, al_get_timer_event_source(timer));
+    
+    while (true){
+        ALLEGRO_EVENT event;
+        al_wait_for_event(queue, &event);
+        if (event.type == ALLEGRO_EVENT_TIMER){
+            retrace_count++;
+        }
+    }
+
+    return NULL;
+}
+
 static void start_key_thread(){
     ALLEGRO_THREAD * thread = al_create_thread(read_keys, NULL);
     if (thread != NULL){
         al_start_thread(thread);
     } else {
         printf("Could not start key thread!\n");
+    }
+}
+
+static void start_system_thread(){
+    ALLEGRO_THREAD * thread = al_create_thread(system_thread, NULL);
+    if (thread != NULL){
+        al_start_thread(thread);
+    } else {
+        printf("Could not start system thread!\n");
     }
 }
 
@@ -527,6 +559,7 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     al_install_mouse();
     // al_set_new_bitmap_flags(ALLEGRO_MEMORY_BITMAP);
     start_key_thread();
+    start_system_thread();
 
     for (index = 16; index < 256; index++){
         desktop_palette[index] = desktop_palette[index & 15];
@@ -580,8 +613,17 @@ int getpixel(BITMAP * buffer, int x, int y){
 }
 
 void putpixel(BITMAP * buffer, int x, int y, int color){
+    ALLEGRO_STATE state;
     draw_into(buffer);
+    if (write_alpha) {
+        al_store_state(&state, ALLEGRO_STATE_BLENDER);
+        al_set_separate_blender(ALLEGRO_ADD, ALLEGRO_ZERO, ALLEGRO_ONE,
+            ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_ZERO);
+    }
     al_draw_pixel(x + 0.5, y + 0.5, a5color(color, current_depth));
+    if (write_alpha) {
+        al_restore_state(&state);
+    }
 }
 
 void line(BITMAP * buffer, int x, int y, int x2, int y2, int color){
@@ -647,6 +689,10 @@ void draw_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y){
 }
 
 void draw_trans_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y){
+    blit(sprite, bmp, 0, 0, x, y, sprite->w, sprite->h);
+}
+
+void draw_lit_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y, int a){
     blit(sprite, bmp, 0, 0, x, y, sprite->w, sprite->h);
 }
 
@@ -1047,11 +1093,11 @@ void rotate_scaled_sprite_v_flip(BITMAP *bmp, BITMAP *sprite, int x, int y, fixe
 }
 
 void solid_mode(){
-    /* FIXME */
+    write_alpha = false;
 }
 
 void drawing_mode(int mode, struct BITMAP *pattern, int x_anchor, int y_anchor){
-    /* FIXME */
+    write_alpha = false;
 }
 
 void quad3d(struct BITMAP *bmp, int type, struct BITMAP *texture, V3D *v1, V3D *v2, V3D *v3, V3D *v4){
@@ -1059,15 +1105,15 @@ void quad3d(struct BITMAP *bmp, int type, struct BITMAP *texture, V3D *v1, V3D *
 }
 
 void set_write_alpha_blender(void){
-    /* FIXME */
+    write_alpha = true;
 }
 
 void set_multiply_blender(int r, int g, int b, int a){
-    /* FIXME */
+    write_alpha = false;
 }
 
 void set_alpha_blender(void){
-    /* FIXME */
+    write_alpha = false;
 }
 
 int show_video_bitmap(BITMAP *bitmap){
