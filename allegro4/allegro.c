@@ -37,6 +37,8 @@ KEYBOARD_DRIVER _keyboard_driver = {0, "A5", "A5", "A5", 0};
 KEYBOARD_DRIVER *keyboard_driver = &_keyboard_driver;
 MOUSE_DRIVER _mouse_driver = {0, "A5", "A5", "A5"};
 MOUSE_DRIVER *mouse_driver = &_mouse_driver;
+GFX_DRIVER _gfx_driver = {0, "A5", "A5", "A5"};
+GFX_DRIVER *gfx_driver = &_gfx_driver;
 void (*keyboard_lowlevel_callback)(int scancode);
 BITMAP * screen;
 static FONT _font;
@@ -49,7 +51,6 @@ volatile int mouse_y;
 volatile int mouse_z;
 volatile int mouse_b;
 static int mickey_x, mickey_y;
-GFX_DRIVER * gfx_driver;
 int current_depth = 8;
 static ALLEGRO_MOUSE_CURSOR *cursor;
 static ALLEGRO_BITMAP *cursor_bitmap;
@@ -365,8 +366,6 @@ int poll_keyboard(){
 }
 
 static void setup_default_driver(BITMAP * screen){
-    gfx_driver = al_malloc(sizeof(GFX_DRIVER));
-    memset(gfx_driver, 0, sizeof(GFX_DRIVER));
     gfx_driver->w = screen->w;
     gfx_driver->h = screen->h;
 }
@@ -1282,4 +1281,21 @@ int get_display_switch_mode(){
 }
 
 void remove_display_switch_callback(void (*cb)()){
+}
+
+void bmp_select(BITMAP *bitmap){
+}
+
+uintptr_t bmp_read_line(BITMAP *bitmap, int row){
+    return (uintptr_t)bitmap->line[row];
+}
+
+uintptr_t bmp_write_line(BITMAP *bitmap, int row){
+    al_lock_bitmap_region(bitmap->real, 0, row, bitmap->w, 1,
+        ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_WRITEONLY);
+    return (uintptr_t)bitmap->line[row];
+}
+
+void bmp_unwrite_line(BITMAP *bitmap){
+    al_unlock_bitmap(bitmap->real);
 }
