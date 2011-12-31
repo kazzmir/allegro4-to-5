@@ -581,7 +581,7 @@ int getpixel(BITMAP * buffer, int x, int y){
 
 void putpixel(BITMAP * buffer, int x, int y, int color){
     draw_into(buffer);
-    al_put_pixel(x, y, a5color(color, current_depth));
+    al_draw_pixel(x + 0.5, y + 0.5, a5color(color, current_depth));
 }
 
 void line(BITMAP * buffer, int x, int y, int x2, int y2, int color){
@@ -643,6 +643,10 @@ void blit(BITMAP * from, BITMAP * to, int from_x, int from_y, int to_x, int to_y
 }
 
 void draw_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y){
+    blit(sprite, bmp, 0, 0, x, y, sprite->w, sprite->h);
+}
+
+void draw_trans_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y){
     blit(sprite, bmp, 0, 0, x, y, sprite->w, sprite->h);
 }
 
@@ -1051,6 +1055,18 @@ void drawing_mode(int mode, struct BITMAP *pattern, int x_anchor, int y_anchor){
 }
 
 void quad3d(struct BITMAP *bmp, int type, struct BITMAP *texture, V3D *v1, V3D *v2, V3D *v3, V3D *v4){
+    /* FIXME */
+}
+
+void set_write_alpha_blender(void){
+    /* FIXME */
+}
+
+void set_multiply_blender(int r, int g, int b, int a){
+    /* FIXME */
+}
+
+void set_alpha_blender(void){
     /* FIXME */
 }
 
