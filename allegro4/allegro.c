@@ -63,7 +63,7 @@ int _allegro_count;
 
 struct{
     int draw_mode;
-    enum {NORMAL, WRITE_ALPHA, MULTIPLY} blend_mode;
+    enum {NORMAL, WRITE_ALPHA, MULTIPLY, TRANS} blend_mode;
     struct {int r, g, b, a;} color;
 } blender;
 
@@ -260,9 +260,6 @@ void unscare_mouse(void){
 }
 
 void scare_mouse_area(int x, int y, int w, int h){
-}
-
-void set_trans_blender(int r, int g, int b, int a){
 }
 
 void create_rgb_table(RGB_MAP *table, AL_CONST PALETTE pal, AL_METHOD(void, callback, (int pos))){
@@ -753,11 +750,30 @@ void draw_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y){
 }
 
 void draw_trans_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y){
-    blit(sprite, bmp, 0, 0, x, y, sprite->w, sprite->h);
+    draw_into(bmp);
+    lazily_create_real_bitmap(sprite, 0);
+    al_set_blender(ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_INVERSE_ALPHA);
+    ALLEGRO_COLOR tint = al_map_rgba(blender.color.a,
+        blender.color.a, blender.color.a, blender.color.a);
+    al_draw_tinted_bitmap(sprite->real, tint, x, y, 0);
 }
 
 void draw_lit_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y, int a){
-    blit(sprite, bmp, 0, 0, x, y, sprite->w, sprite->h);
+    lazily_create_real_bitmap(sprite, 0);
+    ALLEGRO_BITMAP *temp = al_create_bitmap(sprite->w, sprite->h);
+    ALLEGRO_COLOR tint = al_map_rgba(blender.color.r,
+        blender.color.g, blender.color.b, 255);
+    al_set_target_bitmap(temp);
+    al_clear_to_color(tint);
+    al_set_separate_blender(ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_ONE,
+        ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_ZERO);
+    float f = 1 - a / 255.0;
+    ALLEGRO_COLOR alpha = {f, f, f, 1};
+    al_draw_tinted_bitmap(sprite->real, alpha, 0, 0, 0);
+    draw_into(bmp);
+    al_set_blender(ALLEGRO_ADD, ALLEGRO_ALPHA, ALLEGRO_INVERSE_ALPHA);
+    al_draw_bitmap(temp, x, y, 0);
+    al_destroy_bitmap(temp);
 }
 
 void textprintf_ex(struct BITMAP *bmp, struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
@@ -1180,6 +1196,15 @@ void set_write_alpha_blender(void){
 
 void set_multiply_blender(int r, int g, int b, int a){
     blender.blend_mode = MULTIPLY;
+    blender.color.r = r;
+    blender.color.g = g;
+    blender.color.b = b;
+    blender.color.a = a;
+    check_blending();
+}
+
+void set_trans_blender(int r, int g, int b, int a){
+    blender.blend_mode = TRANS;
     blender.color.r = r;
     blender.color.g = g;
     blender.color.b = b;
