@@ -60,7 +60,12 @@ static ALLEGRO_CONFIG **config_stack;
 static int config_stack_size;
 int _gfx_mode_set_count;
 int _allegro_count;
-static bool write_alpha;
+
+struct{
+    int draw_mode;
+    enum {NORMAL, WRITE_ALPHA, MULTIPLY} blend_mode;
+    struct {int r, g, b, a;} color;
+} blender;
 
 JOYSTICK_INFO joy[MAX_JOYSTICKS];
 int num_joysticks;
@@ -117,6 +122,15 @@ static ALLEGRO_COLOR a5color(int a4color, int bit_depth){
     if (bit_depth == 8){
         RGB * rgb = &current_palette[a4color];
         return al_map_rgb(rgb->r * 4, rgb->g * 4, rgb->b * 4);
+    }
+    if (bit_depth == 16){
+        return al_map_rgb(
+            ((a4color >>  0) & 31) * 255 / 31,
+            ((a4color >>  5) & 63) * 255 / 63,
+            ((a4color >> 11) & 31) * 255 / 31);
+    }
+    if (bit_depth == 32){
+        return al_map_rgb(a4color & 255, (a4color >> 8) & 255, (a4color >> 16) & 255);
     }
     /* FIXME: handle other depths */
     return al_map_rgb(1, 1, 1);
@@ -337,14 +351,28 @@ BITMAP * create_bitmap(int width, int height){
 }
 
 static BITMAP * create_bitmap_from(ALLEGRO_BITMAP * real){
-    BITMAP *bitmap = create_bitmap_ex(32, al_get_bitmap_width(real),
+    BITMAP *bitmap = create_bitmap_ex(current_depth, al_get_bitmap_width(real),
         al_get_bitmap_height(real));
     bitmap->real = real;
+    
+    // TODO: other depths
+    if (bitmap->depth == 16){
+        ALLEGRO_LOCKED_REGION *lock = al_lock_bitmap(real,
+            ALLEGRO_PIXEL_FORMAT_BGR_565, ALLEGRO_LOCK_READONLY);
+        int y; for(y = 0; y < bitmap->h; y++){
+            memcpy(bitmap->line[y], (char *)lock->data + y * lock->pitch,
+                bitmap->w * 2);
+        }
+        al_unlock_bitmap(real);
+        al_save_bitmap("test.png", real);
+    }
+    
     return bitmap;
 }
 
 BITMAP * load_bitmap(const char * path,struct RGB *pal){
-    return create_bitmap_from(al_load_bitmap(path));
+    return create_bitmap_from(al_load_bitmap_flags(path,
+        ALLEGRO_NO_PREMULTIPLIED_ALPHA));
 }
 
 struct BITMAP * load_bmp(AL_CONST char *filename, struct RGB *pal){
@@ -542,6 +570,20 @@ static void start_system_thread(){
     }
 }
 
+static void check_blending(){
+    if (blender.draw_mode == DRAW_MODE_TRANS){
+        if (blender.blend_mode == MULTIPLY){
+            al_set_blender(ALLEGRO_ADD, ALLEGRO_DST_COLOR, ALLEGRO_ZERO);
+        }
+        else{
+            al_set_blender(ALLEGRO_ADD, ALLEGRO_ALPHA, ALLEGRO_INVERSE_ALPHA);
+        }
+    }
+    else{
+        al_set_blender(ALLEGRO_ADD, ALLEGRO_ALPHA, ALLEGRO_INVERSE_ALPHA);
+    }
+}
+
 int install_allegro(int system_id, int *errno_ptr, int (*atexit_ptr)(void (*func)(void))){
     return _install_allegro_version_check(system_id, errno_ptr, atexit_ptr, 0);
 }
@@ -564,6 +606,8 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
         desktop_palette[index] = desktop_palette[index & 15];
     }
     
+    check_blending();
+    
     path = al_get_standard_path(ALLEGRO_RESOURCES_PATH);
     al_append_path_component(path, "examples/");
     al_set_path_filename(path, "a4_font.tga");
@@ -577,6 +621,8 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
 
 static void draw_into(BITMAP *bitmap){
     lazily_create_real_bitmap(bitmap, 0);
+    if (al_is_bitmap_locked(bitmap->real))
+        al_unlock_bitmap(bitmap->real);
     al_set_target_bitmap(bitmap->real);
 }
 
@@ -597,7 +643,8 @@ void rect(BITMAP * buffer, int x1, int y1, int x2, int y2, int color){
 
 void rectfill(BITMAP * buffer, int x1, int y1, int x2, int y2, int color){
     draw_into(buffer);
-    al_draw_filled_rectangle(x1, y1, x2+1, y2+1, a5color(color, current_depth));
+    ALLEGRO_COLOR c = a5color(color, current_depth);
+    al_draw_filled_rectangle(x1, y1, x2+1, y2+1, c);
 }
 
 void triangle(BITMAP * buffer, int x1, int y1, int x2, int y2, int x3, int y3, int color){
@@ -612,17 +659,17 @@ int getpixel(BITMAP * buffer, int x, int y){
 }
 
 void putpixel(BITMAP * buffer, int x, int y, int color){
-    ALLEGRO_STATE state;
+    if (blender.draw_mode == DRAW_MODE_TRANS && blender.blend_mode == WRITE_ALPHA){
+        if (!al_is_bitmap_locked(buffer->real)){
+            al_lock_bitmap(buffer->real, ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_READWRITE);
+        }
+        ALLEGRO_COLOR c = al_get_pixel(buffer->real, x, y);
+        c.a = color / 255.0;
+        al_put_pixel(x, y, c);
+        return;
+    }
     draw_into(buffer);
-    if (write_alpha) {
-        al_store_state(&state, ALLEGRO_STATE_BLENDER);
-        al_set_separate_blender(ALLEGRO_ADD, ALLEGRO_ZERO, ALLEGRO_ONE,
-            ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_ZERO);
-    }
     al_draw_pixel(x + 0.5, y + 0.5, a5color(color, current_depth));
-    if (write_alpha) {
-        al_restore_state(&state);
-    }
 }
 
 void line(BITMAP * buffer, int x, int y, int x2, int y2, int color){
@@ -661,20 +708,34 @@ void stretch_blit(BITMAP *source, BITMAP *dest, int source_x,
         
     ALLEGRO_BITMAP * al_from = source->real;
     ALLEGRO_BITMAP * al_to = dest->real;
-     /* A4 allows drawing a bitmap to itself, A5 does not. */
-     if (al_from == al_to) {
-         ALLEGRO_BITMAP *temp = al_create_bitmap(source_width, source_height);
-         al_set_target_bitmap(temp);
-         al_draw_bitmap(al_from, -source_x, -source_y, 0);
-         al_set_target_bitmap(al_to);
-         al_draw_scaled_bitmap(temp, 0, 0, source_width,
-             source_height, dest_x, dest_y, dest_width, dest_height, 0);
-         al_destroy_bitmap(temp);
-     } else {
-         al_set_target_bitmap(al_to);
-         al_draw_scaled_bitmap(al_from, source_x, source_y, source_width,
-             source_height, dest_x, dest_y, dest_width, dest_height, 0);
+    
+    if (al_is_bitmap_locked(al_from))
+        al_unlock_bitmap(al_from);
+    
+    /* A4 allows drawing a bitmap to itself, A5 does not. */
+    if (al_from == al_to) {
+        ALLEGRO_BITMAP *temp = al_create_bitmap(source_width, source_height);
+        al_set_target_bitmap(temp);
+        al_draw_bitmap(al_from, -source_x, -source_y, 0);
+        al_set_target_bitmap(al_to);
+        al_draw_scaled_bitmap(temp, 0, 0, source_width,
+            source_height, dest_x, dest_y, dest_width, dest_height, 0);
+        al_destroy_bitmap(temp);
+    } else {
+        al_set_target_bitmap(al_to);
+        if (blender.draw_mode == DRAW_MODE_TRANS){
+            ALLEGRO_COLOR tint = al_map_rgba(blender.color.r,
+            blender.color.g, blender.color.b, blender.color.a);
+            al_draw_tinted_scaled_bitmap(al_from, tint, source_x, source_y,
+                source_width,
+                source_height, dest_x, dest_y, dest_width, dest_height, 0);
      }
+     else{
+            al_draw_scaled_bitmap(al_from, source_x, source_y,
+                source_width,
+                source_height, dest_x, dest_y, dest_width, dest_height, 0);
+        }
+    }
  
     maybe_flip_screen(dest);
 }
@@ -764,6 +825,10 @@ void draw_gouraud_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y
 int makecol_depth(int depth, int r, int g, int b){
     switch (depth){
         case 8: return bestfit_color(current_palette, r>>2, g>>2, b>>2);
+        case 15: return (r >> 3) + ((g >> 3) << 5) + ((b >> 3) << 10);
+        case 16: return (r >> 3) + ((g >> 2) << 5) + ((b >> 3) << 11);
+        case 24: return r + (g << 8) + (b << 16);
+        case 32: return r + (g << 8) + (b << 16) + (255 << 24);
         /* FIXME: handle 15, 16, 24, 32 */
         default: return 0;
     }
@@ -1091,28 +1156,36 @@ void rotate_scaled_sprite_v_flip(BITMAP *bmp, BITMAP *sprite, int x, int y, fixe
     /* FIXME */
 }
 
-void solid_mode(){
-    write_alpha = false;
-}
-
-void drawing_mode(int mode, struct BITMAP *pattern, int x_anchor, int y_anchor){
-    write_alpha = false;
-}
-
 void quad3d(struct BITMAP *bmp, int type, struct BITMAP *texture, V3D *v1, V3D *v2, V3D *v3, V3D *v4){
     /* FIXME */
 }
 
+void drawing_mode(int mode, struct BITMAP *pattern, int x_anchor, int y_anchor){
+    blender.draw_mode = mode;
+    check_blending();
+}
+
+void solid_mode(){
+    drawing_mode(DRAW_MODE_SOLID, NULL, 0, 0);
+}
+
 void set_write_alpha_blender(void){
-    write_alpha = true;
+    blender.blend_mode =  WRITE_ALPHA;
+    check_blending();
 }
 
 void set_multiply_blender(int r, int g, int b, int a){
-    write_alpha = false;
+    blender.blend_mode = MULTIPLY;
+    blender.color.r = r;
+    blender.color.g = g;
+    blender.color.b = b;
+    blender.color.a = a;
+    check_blending();
 }
 
 void set_alpha_blender(void){
-    write_alpha = false;
+    blender.blend_mode = NORMAL;
+    check_blending();
 }
 
 int show_video_bitmap(BITMAP *bitmap){
