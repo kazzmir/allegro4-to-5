@@ -661,6 +661,7 @@ int getpixel(BITMAP * buffer, int x, int y){
 }
 
 void putpixel(BITMAP * buffer, int x, int y, int color){
+    lazily_create_real_bitmap(buffer, 0);
     if (blender.draw_mode == DRAW_MODE_TRANS && blender.blend_mode == WRITE_ALPHA){
         if (!al_is_bitmap_locked(buffer->real)){
             al_lock_bitmap(buffer->real, ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_READWRITE);
