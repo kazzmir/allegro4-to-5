@@ -654,6 +654,9 @@ void triangle(BITMAP * buffer, int x1, int y1, int x2, int y2, int x3, int y3, i
 int getpixel(BITMAP * buffer, int x, int y){
     lazily_create_real_bitmap(buffer, 0);
     ALLEGRO_BITMAP * al_buffer = buffer->real;
+    if (!al_is_bitmap_locked(al_buffer)){
+        al_lock_bitmap(buffer->real, ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_READWRITE);
+    }
     return a4color(al_get_pixel(al_buffer, x, y), current_depth);
 }
 
@@ -662,13 +665,14 @@ void putpixel(BITMAP * buffer, int x, int y, int color){
         if (!al_is_bitmap_locked(buffer->real)){
             al_lock_bitmap(buffer->real, ALLEGRO_PIXEL_FORMAT_ANY, ALLEGRO_LOCK_READWRITE);
         }
+        al_set_target_bitmap(buffer->real);
         ALLEGRO_COLOR c = al_get_pixel(buffer->real, x, y);
         c.a = color / 255.0;
         al_put_pixel(x, y, c);
-        return;
+    } else {
+        draw_into(buffer);
+        al_draw_pixel(x + 0.5, y + 0.5, a5color(color, current_depth));
     }
-    draw_into(buffer);
-    al_draw_pixel(x + 0.5, y + 0.5, a5color(color, current_depth));
 }
 
 void line(BITMAP * buffer, int x, int y, int x2, int y2, int color){
