@@ -668,8 +668,14 @@ void putpixel(BITMAP * buffer, int x, int y, int color){
         c.a = color / 255.0;
         al_put_pixel(x, y, c);
     } else {
-        draw_into(buffer);
-        al_draw_pixel(x + 0.5, y + 0.5, a5color(color, current_depth));
+        if (al_is_bitmap_locked(buffer->real)){
+            al_set_target_bitmap(buffer->real);
+            al_put_pixel(x, y, a5color(color, current_depth));
+        }
+        else {
+            draw_into(buffer);
+            al_draw_pixel(x + 0.5, y + 0.5, a5color(color, current_depth));
+        }
     }
 }
 
@@ -879,11 +885,11 @@ void clear_to_color(BITMAP *bitmap, int color){
 }
 
 void acquire_screen(){
-
+    draw_into(screen);
 }
 
 void release_screen(){
-
+    maybe_flip_screen(screen);
 }
 
 fixed fixmul(fixed x, fixed y){
