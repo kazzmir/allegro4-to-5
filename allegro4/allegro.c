@@ -364,7 +364,6 @@ static BITMAP * create_bitmap_from(ALLEGRO_BITMAP * real){
                 bitmap->w * 2);
         }
         al_unlock_bitmap(real);
-        al_save_bitmap("test.png", real);
     }
     
     return bitmap;
