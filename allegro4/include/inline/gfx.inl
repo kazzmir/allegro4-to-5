@@ -270,12 +270,11 @@ AL_INLINE(int, get_clip_state, (BITMAP *bitmap),
 
    return bitmap->clip;
 })
+#endif
 
 
 #ifdef __cplusplus
    }
-#endif
-
 #endif
 
 #endif          /* ifndef ALLEGRO_GFX_INL */

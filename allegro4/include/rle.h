@@ -26,12 +26,14 @@
    extern "C" {
 #endif
 
+/*
+struct BITMAP;
 typedef struct BITMAP RLE_SPRITE;
-
 
 AL_FUNC(RLE_SPRITE *, get_rle_sprite, (struct BITMAP *bitmap));
 AL_FUNC(void, destroy_rle_sprite, (RLE_SPRITE *sprite));
 AL_FUNC(void, draw_rle_sprite, (BITMAP *b, RLE_SPRITE *sprite, int x, int y));
+*/
 
 #ifdef __cplusplus
    }

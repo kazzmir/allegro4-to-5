@@ -1,3 +1,4 @@
 Import('env')
 
 SConscript('skater/SConscript', exports = ['env'])
+SConscript('sopwith/SConscript', exports = ['env'])

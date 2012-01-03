@@ -322,3 +322,19 @@ AL_INLINE(int, geta32, (int c),
 {
    return ((c >> _rgb_a_shift_32) & 0xFF);
 })
+
+void set_color(int idx, AL_CONST RGB *p){
+    /* TODO */
+}
+
+void get_color(int idx, RGB *p){
+    /* TODO */
+}
+
+void fade_in(AL_CONST PALETTE p, int speed){
+    /* TODO */
+}
+
+void fade_out(int speed){
+    /* TODO */
+}

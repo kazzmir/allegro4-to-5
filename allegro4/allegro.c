@@ -464,6 +464,10 @@ void clear_bitmap(BITMAP * bitmap){
     al_clear_to_color(al_map_rgb(0, 0, 0));
 }
 
+void clear(BITMAP * bitmap){
+    clear_bitmap(bitmap);
+}
+
 void allegro_message(char const *format, ...){
     va_list args;
     va_start(args, format);
@@ -1304,6 +1308,10 @@ int play_sample(AL_CONST SAMPLE * sample, int volume, int pan, int frequency, in
     return -1;
 }
 
+void destroy_sample(SAMPLE *spl){
+    /* TODO */
+}
+
 void stop_midi(){
     /* FIXME */
 }
@@ -1472,4 +1480,12 @@ uintptr_t bmp_write_line(BITMAP *bitmap, int row){
 
 void bmp_unwrite_line(BITMAP *bitmap){
     al_unlock_bitmap(bitmap->real);
+}
+   
+void ellipsefill(struct BITMAP *bmp, int x, int y, int rx, int ry, int color){
+    /* TODO */
+}
+   
+void arc(struct BITMAP *bmp, int x, int y, fixed ang1, fixed ang2, int r, int color){
+    /* TODO */
 }

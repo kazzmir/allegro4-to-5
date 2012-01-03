@@ -27,7 +27,28 @@
    extern "C" {
 #endif
 
-struct RLE_SPRITE;
+struct GFX_VTABLE;
+struct ALLEGRO_BITMAP;
+typedef struct BITMAP            /* a bitmap structure */
+{
+   struct ALLEGRO_BITMAP * real;
+   int w, h;                     /* width and height in pixels */
+   int clip;                     /* flag if clipping is turned on */
+   int cl, cr, ct, cb;           /* clip left, right, top and bottom values */
+   struct GFX_VTABLE *vtable;           /* drawing functions */
+   void *write_bank;             /* C func on some machines, asm on i386 */
+   void *read_bank;              /* C func on some machines, asm on i386 */
+   void *dat;                    /* the memory we allocated for the bitmap */
+   unsigned long id;             /* for identifying sub-bitmaps */
+   void *extra;                  /* points to a structure with more info */
+   int x_ofs;                    /* horizontal offset (for sub-bitmaps) */
+   int y_ofs;                    /* vertical offset (for sub-bitmaps) */
+   int seg;                      /* bitmap segment */
+   unsigned char **line;
+   int depth;
+} BITMAP;
+
+typedef struct BITMAP RLE_SPRITE;
 struct FONT_GLYPH;
 struct RGB;
 
@@ -189,10 +210,10 @@ typedef struct GFX_VTABLE        /* functions for drawing onto bitmaps */
    AL_METHOD(void, draw_trans_sprite, (struct BITMAP *bmp, struct BITMAP *sprite, int x, int y));
    AL_METHOD(void, draw_trans_rgba_sprite, (struct BITMAP *bmp, struct BITMAP *sprite, int x, int y));
    AL_METHOD(void, draw_lit_sprite, (struct BITMAP *bmp, struct BITMAP *sprite, int x, int y, int color));
-   AL_METHOD(void, draw_rle_sprite, (struct BITMAP *bmp, AL_CONST struct RLE_SPRITE *sprite, int x, int y));
-   AL_METHOD(void, draw_trans_rle_sprite, (struct BITMAP *bmp, AL_CONST struct RLE_SPRITE *sprite, int x, int y));
-   AL_METHOD(void, draw_trans_rgba_rle_sprite, (struct BITMAP *bmp, AL_CONST struct RLE_SPRITE *sprite, int x, int y));
-   AL_METHOD(void, draw_lit_rle_sprite, (struct BITMAP *bmp, AL_CONST struct RLE_SPRITE *sprite, int x, int y, int color));
+   AL_METHOD(void, draw_rle_sprite, (struct BITMAP *bmp, AL_CONST RLE_SPRITE *sprite, int x, int y));
+   AL_METHOD(void, draw_trans_rle_sprite, (struct BITMAP *bmp, AL_CONST RLE_SPRITE *sprite, int x, int y));
+   AL_METHOD(void, draw_trans_rgba_rle_sprite, (struct BITMAP *bmp, AL_CONST RLE_SPRITE *sprite, int x, int y));
+   AL_METHOD(void, draw_lit_rle_sprite, (struct BITMAP *bmp, AL_CONST RLE_SPRITE *sprite, int x, int y, int color));
    AL_METHOD(void, draw_character, (struct BITMAP *bmp, struct BITMAP *sprite, int x, int y, int color, int bg));
    AL_METHOD(void, draw_glyph, (struct BITMAP *bmp, AL_CONST struct FONT_GLYPH *glyph, int x, int y, int color, int bg));
    AL_METHOD(void, blit_from_memory, (struct BITMAP *source, struct BITMAP *dest, int source_x, int source_y, int dest_x, int dest_y, int width, int height));
@@ -270,26 +291,6 @@ AL_ARRAY(_VTABLE_INFO, _vtable_list);
 #define COLOR_DEPTH_32                       \
    {  32,   &__linear_vtable32   },
 
-
-struct ALLEGRO_BITMAP;
-typedef struct BITMAP            /* a bitmap structure */
-{
-   struct ALLEGRO_BITMAP * real;
-   int w, h;                     /* width and height in pixels */
-   int clip;                     /* flag if clipping is turned on */
-   int cl, cr, ct, cb;           /* clip left, right, top and bottom values */
-   GFX_VTABLE *vtable;           /* drawing functions */
-   void *write_bank;             /* C func on some machines, asm on i386 */
-   void *read_bank;              /* C func on some machines, asm on i386 */
-   void *dat;                    /* the memory we allocated for the bitmap */
-   unsigned long id;             /* for identifying sub-bitmaps */
-   void *extra;                  /* points to a structure with more info */
-   int x_ofs;                    /* horizontal offset (for sub-bitmaps) */
-   int y_ofs;                    /* vertical offset (for sub-bitmaps) */
-   int seg;                      /* bitmap segment */
-   unsigned char **line;
-   int depth;
-} BITMAP;
 
 
 #define BMP_ID_VIDEO       0x80000000
@@ -428,6 +429,7 @@ AL_FUNC(void, destroy_bitmap, (BITMAP *bitmap));
 AL_FUNC(void, set_clip_rect, (BITMAP *bitmap, int x1, int y_1, int x2, int y2));
 AL_FUNC(void, add_clip_rect, (BITMAP *bitmap, int x1, int y_1, int x2, int y2));
 AL_FUNC(void, clear_bitmap, (BITMAP *bitmap));
+AL_FUNC(void, clear, (BITMAP * bitmap));
 AL_FUNC(void, vsync, (void));
 int bitmap_color_depth(BITMAP * bitmap);
 void blit(BITMAP * from, BITMAP * to, int from_x, int from_y, int to_x, int to_y, int width, int height);
@@ -485,6 +487,9 @@ AL_FUNC(void, get_clip_rect, (BITMAP *bitmap, int *x1, int *y_1, int *x2, int *y
 AL_FUNC(void, set_clip_state, (BITMAP *bitmap, int state));
 AL_FUNC(int, get_clip_state, (BITMAP *bitmap));
 
+AL_FUNC(RLE_SPRITE *, get_rle_sprite, (struct BITMAP *bitmap));
+AL_FUNC(void, destroy_rle_sprite, (RLE_SPRITE *sprite));
+AL_FUNC(void, draw_rle_sprite, (BITMAP *b, RLE_SPRITE *sprite, int x, int y));
 
 #ifdef __cplusplus
    }

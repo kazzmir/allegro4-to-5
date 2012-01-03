@@ -32,6 +32,7 @@ typedef struct RGB
 #define PAL_SIZE     256
 
 typedef RGB PALETTE[PAL_SIZE];
+#define PALLETE PALETTE
 
 #ifdef __cplusplus
    }
