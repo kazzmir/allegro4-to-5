@@ -283,7 +283,9 @@ static void lazily_create_real_bitmap(BITMAP *bitmap, int is_mono_font){
                 unsigned char green = current_palette[c].g * 4;
                 unsigned char blue = current_palette[c].b * 4;
                 char alpha = 255;
-                if (is_mono_font && c)
+                if (c == 0) {
+                    red = green = blue = alpha = 0;
+                } else if (is_mono_font && c)
                     red = green = blue = 255;
                 rgba[y * lock->pitch + x * 4 + 0] = red;
                 rgba[y * lock->pitch + x * 4 + 1] = green;
@@ -298,31 +300,48 @@ static void lazily_create_real_bitmap(BITMAP *bitmap, int is_mono_font){
 static void lazily_create_real_font(FONT *f){
     if (f->real) return;
     if (!f->data) return;
-    // FIXME: additional glyph ranges
-    FONT_COLOR_DATA *cf = f->data;
-    int maxchars = cf->end - cf->begin;
-    int i, w = 0, h = 0;
-    for (i = 0; i < maxchars; i++) {
-        w += cf->bitmaps[i]->w;
-        h = MAX(h, cf->bitmaps[i]->h);
+    FONT_COLOR_DATA *cfd, *cf0 = f->data;
+    int i, j, w = 0, h = 0;
+    int maxchars = 0;
+    cfd = cf0;
+    int ranges[2 * 256];
+    int ranges_count = 0;
+    while (cfd) {
+        ranges[ranges_count * 2 + 0] = cfd->begin;
+        ranges[ranges_count * 2 + 1] = cfd->end - 1;
+        ranges_count++;
+        int n = cfd->end - cfd->begin;
+        for (i = 0; i < n; i++) {
+            w += cfd->bitmaps[i]->w;
+            h = MAX(h, cfd->bitmaps[i]->h);
+            maxchars++;
+        }
+        cfd = cfd->next;
+        if (ranges_count == 256)
+            break;
     }
 
     ALLEGRO_BITMAP *sheet = al_create_bitmap(w + maxchars + 1, h + 2);
-   
+
     ALLEGRO_STATE state;
     al_store_state(&state, ALLEGRO_STATE_BLENDER);
     al_set_target_bitmap(sheet);
     al_clear_to_color(al_map_rgba(255, 255, 0, 0));
     al_set_blender(ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_ZERO);
+
     int x = 1;
-    for (i = 0; i < maxchars; i++) {
-        lazily_create_real_bitmap(cf->bitmaps[i], 1);
-        al_draw_bitmap(cf->bitmaps[i]->real, x, 1, 0);
-        x += cf->bitmaps[i]->w + 1;
+    cfd = cf0;
+    for (j = 0; j < ranges_count; j++){
+        int n = 1 + ranges[j * 2 + 1] - ranges[j * 2];
+        for (i = 0; i < n; i++) {
+            lazily_create_real_bitmap(cfd->bitmaps[i], 1);
+            al_draw_bitmap(cfd->bitmaps[i]->real, x, 1, 0);
+            x += cfd->bitmaps[i]->w + 1;
+        }
+        cfd = cfd->next;
     }
     al_restore_state(&state);
-    int ranges[] = {cf->begin, cf->end - 1};
-    f->real = al_grab_font_from_bitmap(sheet, 1, ranges);
+    f->real = al_grab_font_from_bitmap(sheet, ranges_count, ranges);
     al_destroy_bitmap(sheet);
 }
 
@@ -404,6 +423,12 @@ void set_color_conversion(int mode){
 }
 
 int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualheight){
+    if (card == GFX_TEXT) {
+        if (display)
+            al_destroy_display(display);
+        display = NULL;
+        return 0;
+    }
     int i;
     display = al_create_display(width, height);
     screen = create_bitmap_from(al_get_backbuffer(display));
@@ -608,6 +633,7 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     al_append_path_component(path, "examples/");
     al_set_path_filename(path, "a4_font.tga");
     font->real = al_load_font(al_path_cstr(path, '/'), 0, 0);
+    font->is_color = true;
     al_destroy_path(path);
     
     _allegro_count++;
@@ -1349,11 +1375,6 @@ int stricmp(AL_CONST char *s1, AL_CONST char *s2){
 
 void release_voice(int voice){
     /* FIXME */
-}
-
-void destroy_font(FONT *f){
-    al_destroy_font(f->real);
-    al_free(f);
 }
 
 void destroy_rle_sprite(RLE_SPRITE *rle){

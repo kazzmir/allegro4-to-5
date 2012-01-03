@@ -605,7 +605,7 @@ char *append_filename(char *dest, AL_CONST char *path, AL_CONST char *filename, 
  *  to the filename portion. Both '\' and '/' are recognized as directory
  *  separators.
  */
-char *get_filename(AL_CONST char *path)
+char *get_filename(char const *path)
 {
    int c;
    char *ptr, *ret;

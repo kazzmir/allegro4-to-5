@@ -471,7 +471,7 @@ static FONT *read_font(PACKFILE *pack)
    int height = 0;
    int depth;
 
-   f = _AL_MALLOC(sizeof(FONT));
+   f = al_calloc(1, sizeof(FONT));
    if (!f) {
       *allegro_errno = ENOMEM;
       return NULL;
@@ -508,6 +508,7 @@ static FONT *read_font(PACKFILE *pack)
             depth = 8;
 
 //       f->vtable = font_vtable_color;
+         f->is_color = true;
 
          cf = read_font_color(pack, &height, depth);
          if (!cf) {
@@ -1357,7 +1358,7 @@ static void *load_file_object(PACKFILE *f, long size)
  *  Loads an entire data file into memory, and returns a pointer to it. 
  *  On error, sets errno and returns NULL.
  */
-DATAFILE *load_datafile(AL_CONST char *filename)
+DATAFILE *load_datafile(char const *filename)
 {
    ASSERT(filename);
    return load_datafile_callback(filename, NULL);

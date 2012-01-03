@@ -9,9 +9,11 @@
 #include <stdarg.h>
 
 #define AL_FUNC(type, name, args)               type name args
-#ifndef AL_CONST
-#define AL_CONST const
+#ifdef AL_CONST
+#undef AL_CONST
 #endif
+#define AL_CONST const
+
 #define AL_VAR(type, name) extern type name
 #ifndef AL_INLINE
 #define AL_INLINE(type, name, args, code)       inline type name args code;

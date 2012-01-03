@@ -20,6 +20,7 @@
 #define ALLEGRO_FONT_H
 
 #include "base.h"
+#include <stdbool.h>
 
 #ifdef __cplusplus
    extern "C" {
@@ -39,6 +40,7 @@ typedef struct FONT
    void *data;
    int height;
    //struct FONT_VTABLE *vtable;
+   bool is_color;
    struct ALLEGRO_FONT *real;
 } FONT;
 
@@ -51,7 +53,7 @@ AL_FUNC(int, is_mono_font, (FONT *f));
 AL_FUNC(int, is_compatible_font, (FONT *f1, FONT *f2));
 
 AL_FUNC(void, register_font_file_type, (AL_CONST char *ext, FONT *(*load)(AL_CONST char *filename, RGB *pal, void *param)));
-AL_FUNC(FONT *, load_font, (AL_CONST char *filename, RGB *pal, void *param));
+AL_FUNC(FONT *, load_font, (char const *filename, RGB *pal, void *param));
 
 AL_FUNC(FONT *, load_dat_font, (AL_CONST char *filename, RGB *pal, void *param));
 AL_FUNC(FONT *, load_bios_font, (AL_CONST char *filename, RGB *pal, void *param));

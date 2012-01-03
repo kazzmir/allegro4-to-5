@@ -72,7 +72,7 @@ typedef struct DATAFILE_INDEX
 } DATAFILE_INDEX;
 
 
-AL_FUNC(DATAFILE *, load_datafile, (AL_CONST char *filename));
+AL_FUNC(DATAFILE *, load_datafile, (char const *filename));
 AL_FUNC(DATAFILE *, load_datafile_callback, (AL_CONST char *filename, AL_METHOD(void, callback, (DATAFILE *))));
 AL_FUNC(DATAFILE_INDEX *, create_datafile_index, (AL_CONST char *filename));
 AL_FUNC(void, unload_datafile, (DATAFILE *dat));
