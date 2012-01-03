@@ -30,6 +30,7 @@
 #include "include/compiled.h"
 #include "include/system.h"
 #include "include/timer.h"
+#include "include/quat.h"
 
 #ifdef __cplusplus
    extern "C" {

@@ -37,6 +37,8 @@ KEYBOARD_DRIVER _keyboard_driver = {0, "A5", "A5", "A5", 0};
 KEYBOARD_DRIVER *keyboard_driver = &_keyboard_driver;
 MOUSE_DRIVER _mouse_driver = {0, "A5", "A5", "A5"};
 MOUSE_DRIVER *mouse_driver = &_mouse_driver;
+TIMER_DRIVER _timer_driver = {0, "A5", "A5", "A5"};
+TIMER_DRIVER *timer_driver = &_timer_driver;
 GFX_DRIVER _gfx_driver = {0, "A5", "A5", "A5"};
 GFX_DRIVER *gfx_driver = &_gfx_driver;
 void (*keyboard_lowlevel_callback)(int scancode);
@@ -366,6 +368,13 @@ BITMAP * create_bitmap_ex(int depth, int width, int height){
 
 BITMAP * create_bitmap(int width, int height){
     return create_bitmap_ex(current_depth, width, height);
+}
+
+BITMAP * create_sub_bitmap(BITMAP *parent, int x, int y, int width, int height){
+    BITMAP * bitmap = al_calloc(1, sizeof(BITMAP));
+    lazily_create_real_bitmap(parent, 0);
+    bitmap->real = al_create_sub_bitmap(parent->real, x, y, width, height);
+    return bitmap;
 }
 
 static BITMAP * create_bitmap_from(ALLEGRO_BITMAP * real){
@@ -783,6 +792,10 @@ void draw_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y){
     blit(sprite, bmp, 0, 0, x, y, sprite->w, sprite->h);
 }
 
+void masked_blit(BITMAP * from, BITMAP * to, int from_x, int from_y, int to_x, int to_y, int width, int height){
+    blit(from, to, from_x, from_y, to_x, to_y, width, height);
+}
+
 void draw_trans_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y){
     draw_into(bmp);
     lazily_create_real_bitmap(sprite, 0);
@@ -790,6 +803,36 @@ void draw_trans_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y){
     ALLEGRO_COLOR tint = al_map_rgba(blender.color.a,
         blender.color.a, blender.color.a, blender.color.a);
     al_draw_tinted_bitmap(sprite->real, tint, x, y, 0);
+}
+
+void draw_sprite_h_flip(BITMAP *bmp, BITMAP *sprite, int x, int y){
+    draw_into(bmp);
+    lazily_create_real_bitmap(sprite, 0);
+    al_draw_bitmap(sprite->real, x, y, ALLEGRO_FLIP_HORIZONTAL);
+}
+
+void draw_sprite_v_flip(BITMAP *bmp, BITMAP *sprite, int x, int y){
+    draw_into(bmp);
+    lazily_create_real_bitmap(sprite, 0);
+    al_draw_bitmap(sprite->real, x, y, ALLEGRO_FLIP_VERTICAL);
+}
+
+void draw_sprite_vh_flip(BITMAP *bmp, BITMAP *sprite, int x, int y){
+    draw_into(bmp);
+    lazily_create_real_bitmap(sprite, 0);
+    al_draw_bitmap(sprite->real, x, y, ALLEGRO_FLIP_HORIZONTAL | ALLEGRO_FLIP_VERTICAL);
+}
+
+void pivot_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y, int cx, int cy, fixed angle){
+    draw_into(bmp);
+    lazily_create_real_bitmap(sprite, 0);
+    al_draw_rotated_bitmap(sprite->real, cx, cy, x, y, angle * ALLEGRO_PI / 65536.0 / 256.0, 0);
+}
+
+void pivot_sprite_v_flip(BITMAP *bmp, BITMAP *sprite, int x, int y, int cx, int cy, fixed angle){
+    draw_into(bmp);
+    lazily_create_real_bitmap(sprite, 0);
+    al_draw_rotated_bitmap(sprite->real, cx, cy, x, y, angle * ALLEGRO_PI / 65536.0 / 256.0, ALLEGRO_FLIP_VERTICAL);
 }
 
 void draw_lit_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y, int a){
@@ -1275,13 +1318,13 @@ void set_volume(int digi_volume, int midi_volume){
 }
 
 int text_length(AL_CONST struct FONT *f, AL_CONST char *str){
-    /* FIXME */
-    return -1;
+    lazily_create_real_font((FONT *)f);
+    return al_get_text_width(f->real, str);
 }
 
 int text_height(AL_CONST struct FONT *f){
-    /* FIXME */
-    return -1;
+    lazily_create_real_font((FONT *)f);
+    return al_get_font_line_height(f->real);
 }
 
 void set_keyboard_rate(int delay, int repeat){
