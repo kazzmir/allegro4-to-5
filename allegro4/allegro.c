@@ -285,8 +285,9 @@ static void lazily_create_real_bitmap(BITMAP *bitmap, int is_mono_font){
                 char alpha = 255;
                 if (c == 0) {
                     red = green = blue = alpha = 0;
-                } else if (is_mono_font && c)
+                } else if (is_mono_font && c){
                     red = green = blue = 255;
+                }
                 rgba[y * lock->pitch + x * 4 + 0] = red;
                 rgba[y * lock->pitch + x * 4 + 1] = green;
                 rgba[y * lock->pitch + x * 4 + 2] = blue;
@@ -297,31 +298,32 @@ static void lazily_create_real_bitmap(BITMAP *bitmap, int is_mono_font){
     al_unlock_bitmap(bitmap->real);
 }
 
-static void lazily_create_real_font(FONT *f){
-    if (f->real) return;
-    if (!f->data) return;
-    FONT_COLOR_DATA *cfd, *cf0 = f->data;
-    int i, j, w = 0, h = 0;
+static void lazily_create_real_font(FONT *font){
+    if (font->real) return;
+    if (!font->data) return;
+    FONT_COLOR_DATA * color_iterator;
+    FONT_COLOR_DATA * color_data = font->data;
+    int i, j, width = 0, height = 0;
     int maxchars = 0;
-    cfd = cf0;
+    color_iterator = color_data;
     int ranges[2 * 256];
     int ranges_count = 0;
-    while (cfd) {
-        ranges[ranges_count * 2 + 0] = cfd->begin;
-        ranges[ranges_count * 2 + 1] = cfd->end - 1;
+    while (color_iterator) {
+        ranges[ranges_count * 2 + 0] = color_iterator->begin;
+        ranges[ranges_count * 2 + 1] = color_iterator->end - 1;
         ranges_count++;
-        int n = cfd->end - cfd->begin;
-        for (i = 0; i < n; i++) {
-            w += cfd->bitmaps[i]->w;
-            h = MAX(h, cfd->bitmaps[i]->h);
-            maxchars++;
+        int count = color_iterator->end - color_iterator->begin;
+        for (i = 0; i < count; i++) {
+            width += color_iterator->bitmaps[i]->w;
+            height = MAX(height, color_iterator->bitmaps[i]->h);
+            maxchars += 1;
         }
-        cfd = cfd->next;
+        color_iterator = color_iterator->next;
         if (ranges_count == 256)
             break;
     }
 
-    ALLEGRO_BITMAP *sheet = al_create_bitmap(w + maxchars + 1, h + 2);
+    ALLEGRO_BITMAP *sheet = al_create_bitmap(width + maxchars + 1, height + 2);
 
     ALLEGRO_STATE state;
     al_store_state(&state, ALLEGRO_STATE_BLENDER);
@@ -330,18 +332,18 @@ static void lazily_create_real_font(FONT *f){
     al_set_blender(ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_ZERO);
 
     int x = 1;
-    cfd = cf0;
+    color_iterator = color_data;
     for (j = 0; j < ranges_count; j++){
-        int n = 1 + ranges[j * 2 + 1] - ranges[j * 2];
-        for (i = 0; i < n; i++) {
-            lazily_create_real_bitmap(cfd->bitmaps[i], 1);
-            al_draw_bitmap(cfd->bitmaps[i]->real, x, 1, 0);
-            x += cfd->bitmaps[i]->w + 1;
+        int count = 1 + ranges[j * 2 + 1] - ranges[j * 2];
+        for (i = 0; i < count; i++) {
+            lazily_create_real_bitmap(color_iterator->bitmaps[i], 1);
+            al_draw_bitmap(color_iterator->bitmaps[i]->real, x, 1, 0);
+            x += color_iterator->bitmaps[i]->w + 1;
         }
-        cfd = cfd->next;
+        color_iterator = color_iterator->next;
     }
     al_restore_state(&state);
-    f->real = al_grab_font_from_bitmap(sheet, ranges_count, ranges);
+    font->real = al_grab_font_from_bitmap(sheet, ranges_count, ranges);
     al_destroy_bitmap(sheet);
 }
 
