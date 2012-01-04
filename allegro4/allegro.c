@@ -102,15 +102,6 @@ int _rgb_scale_6[64] =
    227, 231, 235, 239, 243, 247, 251, 255
 };
 
-
-/*
-struct BITMAP{
-    ALLEGRO_BITMAP * real;
-    int w;
-    int h;
-};
-*/
-
 /* allegro4 uses 0 as ok values */
 static int is_ok(int code){
     if (code){
@@ -270,14 +261,12 @@ void create_rgb_table(RGB_MAP *table, AL_CONST PALETTE pal, AL_METHOD(void, call
 void create_light_table(COLOR_MAP *table, AL_CONST PALETTE pal, int r, int g, int b, AL_METHOD(void, callback, (int pos))){
 }
 
-static void lazily_create_real_bitmap(BITMAP *bitmap, int is_mono_font){
-    if (bitmap->real) return;
-    bitmap->real = al_create_bitmap(bitmap->w, bitmap->h);
-    ALLEGRO_LOCKED_REGION *lock = al_lock_bitmap(bitmap->real,
-        ALLEGRO_PIXEL_FORMAT_ABGR_8888_LE, ALLEGRO_LOCK_WRITEONLY);
-    char *rgba = lock->data;
+static void convert_8bit(BITMAP * bitmap, int is_mono_font){
     if (bitmap->depth == 8){
         int x, y;
+        ALLEGRO_LOCKED_REGION *lock = al_lock_bitmap(bitmap->real,
+                                                     ALLEGRO_PIXEL_FORMAT_ABGR_8888_LE, ALLEGRO_LOCK_WRITEONLY);
+        char *rgba = lock->data;
         for (y = 0; y < bitmap->h; y++){
             for (x = 0; x < bitmap->w; x++){
                 int c = *(bitmap->line[y] + x);
@@ -296,8 +285,15 @@ static void lazily_create_real_bitmap(BITMAP *bitmap, int is_mono_font){
                 rgba[y * lock->pitch + x * 4 + 3] = alpha;
             }
         }
+        al_unlock_bitmap(bitmap->real);
     }
-    al_unlock_bitmap(bitmap->real);
+}
+
+static void lazily_create_real_bitmap(BITMAP *bitmap, int is_mono_font){
+    if (bitmap->real == NULL){
+        bitmap->real = al_create_bitmap(bitmap->w, bitmap->h);
+        convert_8bit(bitmap, is_mono_font);
+    }
 }
 
 static void lazily_create_real_font(FONT *font){
