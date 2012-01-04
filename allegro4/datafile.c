@@ -590,6 +590,7 @@ static SAMPLE *read_sample(PACKFILE *f)
       s->stereo = FALSE;
    }
 
+   s->real = NULL;
    s->freq = pack_mgetw(f);
    s->len = pack_mgetl(f);
    s->priority = 128;

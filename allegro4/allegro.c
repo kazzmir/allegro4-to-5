@@ -11,6 +11,7 @@ int AL_RAND(){
 #include <allegro5/allegro_primitives.h>
 #include <allegro5/allegro_image.h>
 #include <allegro5/allegro_font.h>
+#include <allegro5/allegro_audio.h>
 
 #include "include/internal/aintern.h"
 
@@ -628,6 +629,8 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     al_init_primitives_addon();
     al_init_image_addon();
     al_init_font_addon();
+    al_install_audio();
+    al_reserve_samples(10);
     al_install_keyboard();
     al_install_mouse();
     // al_set_new_bitmap_flags(ALLEGRO_MEMORY_BITMAP);
@@ -1299,9 +1302,30 @@ int show_video_bitmap(BITMAP *bitmap){
     return 0;
 }
 
+static void lazily_create_sample(SAMPLE * sample){
+    if (sample->real == NULL){
+        ALLEGRO_CHANNEL_CONF channels = ALLEGRO_CHANNEL_CONF_1;
+        ALLEGRO_AUDIO_DEPTH depth = ALLEGRO_AUDIO_DEPTH_UINT8;
+        switch (sample->stereo){
+            case 0: channels = ALLEGRO_CHANNEL_CONF_1; break;
+            case 1: channels = ALLEGRO_CHANNEL_CONF_2; break;
+        }
+        switch (sample->bits){
+            case 8: depth = ALLEGRO_AUDIO_DEPTH_UINT8; break;
+            case 16: depth = ALLEGRO_AUDIO_DEPTH_UINT16; break;
+        }
+        sample->real = al_create_sample(sample->data, sample->len, sample->freq, depth, channels, false);
+    }
+}
+
 int play_sample(AL_CONST SAMPLE * sample, int volume, int pan, int frequency, int loop){
-    /* FIXME */
-    return -1;
+    int a5_loop = ALLEGRO_PLAYMODE_ONCE;
+    lazily_create_sample((SAMPLE*) sample);
+    switch (loop){
+        case 1: a5_loop = ALLEGRO_PLAYMODE_LOOP; break;
+        default: a5_loop = ALLEGRO_PLAYMODE_ONCE; break;
+    }
+    return is_ok(al_play_sample(sample->real, volume / 255.0, (pan - 128.0) / 128.0, frequency / 1000.0, a5_loop, NULL));
 }
 
 void destroy_sample(SAMPLE *spl){

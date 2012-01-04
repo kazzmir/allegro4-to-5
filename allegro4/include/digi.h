@@ -32,8 +32,10 @@ struct PACKFILE;
                                        /* actual drivers may not be */
                                        /* able to handle this many */
 
+struct ALLEGRO_SAMPLE;
 typedef struct SAMPLE                  /* a sample */
 {
+    struct ALLEGRO_SAMPLE * real;
    int bits;                           /* 8 or 16 */
    int stereo;                         /* sample type flag */
    int freq;                           /* sample frequency */

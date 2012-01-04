@@ -8,7 +8,7 @@ def defaultEnvironment():
     return env
 
 def allegro4Environment():
-    allegro_libs = ["allegro", "allegro_primitives", "allegro_image", "allegro_font"]
+    allegro_libs = ["allegro", "allegro_primitives", "allegro_image", "allegro_font", "allegro_audio"]
     allegro_version = "5.1"
     env = defaultEnvironment()
     if debug:
