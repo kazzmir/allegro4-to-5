@@ -1099,7 +1099,7 @@ struct timer_stuff{
 static void * start_timer(ALLEGRO_THREAD * self, void * arg){
     struct timer_stuff * stuff = (struct timer_stuff*) arg;
     ALLEGRO_TIMER * timer;
-    double speed = stuff->speed / 1000.0;
+    double speed = (double) stuff->speed / (double) TIMERS_PER_SECOND;
     ALLEGRO_EVENT_QUEUE * queue = al_create_event_queue();
 
     timer = al_create_timer(speed);
