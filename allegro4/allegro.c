@@ -1482,10 +1482,16 @@ void bmp_unwrite_line(BITMAP *bitmap){
     al_unlock_bitmap(bitmap->real);
 }
    
-void ellipsefill(struct BITMAP *bmp, int x, int y, int rx, int ry, int color){
-    /* TODO */
+void ellipsefill(BITMAP * buffer, int x, int y, int rx, int ry, int color){
+    draw_into(buffer);
+    al_draw_filled_ellipse(x, y, rx, ry, a5color(color, current_depth));
 }
-   
-void arc(struct BITMAP *bmp, int x, int y, fixed ang1, fixed ang2, int r, int color){
-    /* TODO */
+
+static double fixangle_to_radians(fixed angle){
+    return (fixtof(angle) * 360 / 256.0) * AL_PI / 180;
+}
+
+void arc(BITMAP * buffer, int x, int y, fixed ang1, fixed ang2, int r, int color){
+    draw_into(buffer);
+    al_draw_arc(x, y, r, fixangle_to_radians(ang1), fixangle_to_radians(ang2), a5color(color, current_depth), 1);
 }
