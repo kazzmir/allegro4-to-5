@@ -655,13 +655,6 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     
     check_blending();
     
-    path = al_get_standard_path(ALLEGRO_RESOURCES_PATH);
-    al_append_path_component(path, "examples/");
-    al_set_path_filename(path, "a4_font.tga");
-    font->real = al_load_font(al_path_cstr(path, '/'), 0, 0);
-    font->is_color = true;
-    al_destroy_path(path);
-    
     _allegro_count++;
 
     return is_ok(ok);
@@ -1532,9 +1525,9 @@ COMPILED_SPRITE *get_compiled_sprite(BITMAP *bitmap, int planar){
     return bitmap;
 }
 
-void *_al_sane_realloc(void *ptr, size_t size){
-    return al_realloc(ptr, size);
-}
+//void *_al_sane_realloc(void *ptr, size_t size){
+//    return al_realloc(ptr, size);
+//}
 
 int set_display_switch_callback(int dir, void (*cb)()){
     return 0;
