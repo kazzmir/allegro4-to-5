@@ -60,6 +60,7 @@ static ALLEGRO_BITMAP *cursor_bitmap;
 static int cursor_x, cursor_y;
 static ALLEGRO_CONFIG *current_config;
 static ALLEGRO_CONFIG **config_stack;
+static bool config_overridden;
 static int config_stack_size;
 int _gfx_mode_set_count;
 int _allegro_count;
@@ -732,14 +733,6 @@ void vline(BITMAP * buffer, int x, int y, int y2, int color){
     line(buffer, x, y, x, y2, color);
 }
 
-void set_palette(const PALETTE palette){
-    memcpy(current_palette, palette, sizeof(PALETTE));
-}
-
-void get_palette(PALETTE palette){
-    memcpy(palette, current_palette, sizeof(PALETTE));
-}
-
 static void maybe_flip_screen(BITMAP * where){
     if (where == screen){
         al_flip_display();
@@ -1232,10 +1225,34 @@ void pop_config_state(){
     config_stack = al_realloc(config_stack, config_stack_size * sizeof *config_stack);
 }
 
+void override_config_file(AL_CONST char *filename)
+{
+    if (filename) {
+        if (!config_overridden) {
+            config_overridden = true;
+            push_config_state();
+        }
+        set_config_file(filename);
+    }
+    else {
+        if (config_overridden) {
+            config_overridden = false;
+            pop_config_state();
+        }
+    }
+}
+
 void set_config_file(char const *filename){
     if (current_config) al_destroy_config(current_config);
     current_config = al_load_config_file(filename);
     if (!current_config) current_config = al_create_config();
+}
+
+void set_config_string(AL_CONST char *section, AL_CONST char *name, AL_CONST char *val)
+{
+    if (!current_config)
+        return;
+   al_set_config_value(current_config, section, name, val);
 }
 
 static char _tokens[64][64];
