@@ -49,12 +49,25 @@ int play_sample(AL_CONST SAMPLE * sample, int volume, int pan, int frequency, in
 
 SAMPLE *load_sample(AL_CONST char *filename)
 {
-    /* TODO */
-    return NULL;
+    SAMPLE *sample = al_calloc(sizeof *sample, 1);
+    sample->real = al_load_sample(filename);
+    switch (al_get_sample_depth(sample->real)) {
+        case ALLEGRO_AUDIO_DEPTH_UINT8: sample->bits = 8; break;
+        case ALLEGRO_AUDIO_DEPTH_UINT16: sample->bits = 16; break;
+        default: break;
+    }
+    switch (al_get_sample_channels(sample->real)) {
+        case ALLEGRO_CHANNEL_CONF_2: sample->stereo = 1; break;
+        default: break;
+    }
+    return sample;
 }
 
-void destroy_sample(SAMPLE *spl){
-    /* TODO */
+void destroy_sample(SAMPLE *sample){
+    if (sample->real) {
+        al_destroy_sample(sample->real);
+    }
+    al_free(sample);
 }
 
 void stop_midi(){
