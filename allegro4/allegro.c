@@ -917,6 +917,80 @@ void textout_ex(struct BITMAP *bmp, struct FONT *f, AL_CONST char *str, int x, i
     maybe_flip_screen(bmp);
 }
 
+int _textmode = 0;
+
+int text_mode(int mode)
+{
+   int old_mode = _textmode;
+
+   if (mode < 0)
+      _textmode = -1;
+   else
+      _textmode = mode;
+
+   return old_mode;
+}
+
+void textprintf_centre(BITMAP *bmp, FONT *f, int x, int y, int color, AL_CONST char *format, ...)
+{
+   char buf[512];
+   va_list ap;
+   ASSERT(bmp);
+   ASSERT(f);
+   ASSERT(format);
+
+   va_start(ap, format);
+   uvszprintf(buf, sizeof(buf), format, ap);
+   va_end(ap);
+
+   textout_centre_ex(bmp, f, buf, x, y, color, _textmode);
+}
+
+void textprintf_right(BITMAP *bmp, FONT *f, int x, int y, int color, AL_CONST char *format, ...)
+{
+   char buf[512];
+   va_list ap;
+   ASSERT(bmp);
+   ASSERT(f);
+   ASSERT(format);
+
+   va_start(ap, format);
+   uvszprintf(buf, sizeof(buf), format, ap);
+   va_end(ap);
+
+   textout_right_ex(bmp, f, buf, x, y, color, _textmode);
+}
+
+void textprintf(BITMAP *bmp, FONT *f, int x, int y, int color, AL_CONST char *format, ...)
+{
+   char buf[512];
+   va_list ap;
+   ASSERT(bmp);
+   ASSERT(f);
+   ASSERT(format);
+
+   va_start(ap, format);
+   uvszprintf(buf, sizeof(buf), format, ap);
+   va_end(ap);
+
+   textout_ex(bmp, f, buf, x, y, color, _textmode);
+}
+
+void textout(struct BITMAP *bmp, FONT *f, AL_CONST char *str, int x, int y, int color)
+{
+   textout_ex(bmp, f, str, x, y, color, _textmode);
+}
+
+void textout_centre(struct BITMAP *bmp, FONT *f, AL_CONST char *str, int x, int y, int color)
+{
+   textout_centre_ex(bmp, f, str, x, y, color, _textmode);
+}
+
+void textout_right(struct BITMAP *bmp, FONT *f, AL_CONST char *str, int x, int y, int color)
+{
+   textout_right_ex(bmp, f, str, x, y, color, _textmode);
+}
+
 void draw_gouraud_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y, int c1, int c2, int c3, int c4){
     draw_into(bmp);
     al_draw_bitmap(sprite->real, x, y, 0);
@@ -942,6 +1016,17 @@ void set_clip_rect(BITMAP * bitmap, int x1, int y1, int x2, int y2){
 
 void set_clip_state(BITMAP * bitmap, int onoff){
 
+}
+
+void set_clip(BITMAP *bitmap, int x1, int y1, int x2, int y2)
+{
+   if ((!x1) && (!y1) && (!x2) && (!y2)) {
+      set_clip_rect(bitmap, 0, 0, bitmap->w-1, bitmap->h-1);
+      set_clip_state(bitmap, FALSE);
+      return;
+   }
+   set_clip_rect(bitmap, x1, y1, x2, y2);
+   set_clip_state(bitmap, TRUE);
 }
 
 int bitmap_color_depth(BITMAP * bitmap){
