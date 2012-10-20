@@ -301,7 +301,10 @@ static void lazily_create_real_bitmap(BITMAP *bitmap, int is_mono_font){
 
 static void lazily_create_real_font(FONT *font){
     if (font->real) return;
-    if (!font->data) return;
+    if (!font->data) {
+        font->real = al_create_builtin_font();
+        return;
+    }
     FONT_COLOR_DATA * color_iterator;
     FONT_COLOR_DATA * color_data = font->data;
     int i, j, width = 0, height = 0;
