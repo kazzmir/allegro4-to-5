@@ -354,13 +354,13 @@ static FONT *read_font_prop(PACKFILE *pack, int maxchars)
 /* read_font_mono:
  *  Helper for read_font, below
  */
-static FONT_MONO_DATA *read_font_mono(PACKFILE *f, int *hmax)
+static FONT_COLOR_DATA *read_font_mono(PACKFILE *f, int *hmax)
 {
-   FONT_MONO_DATA *mf = NULL;
-   int max = 0, i = 0;
-   FONT_GLYPH **gl = NULL;
+   FONT_COLOR_DATA *mf = NULL;
+   int max = 0, i = 0, x, y;
+   unsigned char *dat = NULL;
    
-   mf = _AL_MALLOC(sizeof(FONT_MONO_DATA));
+   mf = _AL_MALLOC(sizeof(FONT_COLOR_DATA));
    if (!mf) {
       *allegro_errno = ENOMEM;
       return NULL;
@@ -370,38 +370,42 @@ static FONT_MONO_DATA *read_font_mono(PACKFILE *f, int *hmax)
    mf->end = pack_mgetl(f) + 1;
    mf->next = NULL;
    max = mf->end - mf->begin;
-   
-   mf->glyphs = gl = _AL_MALLOC(sizeof(FONT_GLYPH *) * max);
-   if (!gl) {
-      _AL_FREE(mf);
-      *allegro_errno = ENOMEM;
-      return NULL;
-   }
-   
+
+   mf->bitmaps = _AL_MALLOC(sizeof(BITMAP *) * max);
+
    for (i = 0; i < max; i++) {
       int w, h, sz;
+      int pitch;
       
       w = pack_mgetw(f);
       h = pack_mgetw(f);
-      sz = ((w + 7) / 8) * h;
+      pitch = (w + 7) / 8;
+      sz = pitch * h;
       
       if (h > *hmax) *hmax = h;
-      
-      gl[i] = _AL_MALLOC(sizeof(FONT_GLYPH) + sz);
-      if (!gl[i]) {
-         while (i) {
-            i--;
-            _AL_FREE(mf->glyphs[i]);
-         }
-         _AL_FREE(mf);
-         _AL_FREE(mf->glyphs);
-         *allegro_errno = ENOMEM;
-         return NULL;
+
+      dat = _AL_MALLOC(sz);
+      pack_fread(dat, sz, f);
+
+      mf->bitmaps[i] = create_bitmap(w, h);
+      clear_bitmap(mf->bitmaps[i]);
+      ALLEGRO_LOCKED_REGION *lock = al_lock_bitmap(mf->bitmaps[i]->real,
+        ALLEGRO_PIXEL_FORMAT_ABGR_8888, ALLEGRO_LOCK_WRITEONLY);
+      for (y = 0; y < h; y++) {
+          unsigned char *row = lock->data + lock->pitch * y;
+          unsigned char *source = dat + pitch * y;
+          for (x = 0; x < w; x++) {
+              int c = (source[(x >> 3)] & (1 << (7 - (x & 7)))) ? 255 : 0;              
+              row[0] = c;
+              row[1] = c;
+              row[2] = c;
+              row[3] = c;
+              row += 4;
+          }
       }
-      
-      gl[i]->w = w;
-      gl[i]->h = h;
-      pack_fread(gl[i]->dat, sz, f);
+      al_unlock_bitmap(mf->bitmaps[i]->real);
+
+      _AL_FREE(dat);
    }
    
    return mf;
@@ -483,7 +487,7 @@ static FONT *read_font(PACKFILE *pack)
    while (num_ranges--) {
       depth = pack_getc(pack);
       if (depth == 1 || depth == 255) {
-         FONT_MONO_DATA *mf = 0, *iter = (FONT_MONO_DATA *)f->data;
+         FONT_COLOR_DATA *mf = 0, *iter = (FONT_COLOR_DATA *)f->data;
          
 //       f->vtable = font_vtable_mono;
 
