@@ -372,6 +372,8 @@ BITMAP * create_sub_bitmap(BITMAP *parent, int x, int y, int width, int height){
     BITMAP * bitmap = al_calloc(1, sizeof(BITMAP));
     lazily_create_real_bitmap(parent, 0);
     bitmap->real = al_create_sub_bitmap(parent->real, x, y, width, height);
+    bitmap->w = width;
+    bitmap->h = height;
     return bitmap;
 }
 
