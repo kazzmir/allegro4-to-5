@@ -1,18 +1,24 @@
 import os, glob, re
 
 debug = ARGUMENTS.get("debug", "")
+static = ARGUMENTS.get("static", "")
 
 def defaultEnvironment():
     env = Environment(ENV = os.environ)
+    #env.Replace(CC = "clang")
     env.Append(CCFLAGS = ['-g3', '-Wall'])
     return env
 
 def allegro_libname(name):
     allegro_version = "5.1"
-    if debug:
-        return name + "-debug-" + allegro_version
+    if static:
+        version = "static-" + allegro_version
     else:
-        return name + "-" + allegro_version
+        version = "allegro-version"
+    if debug:
+        return name + "-debug-" + version
+    else:
+        return name + "-" + version
 
 def CheckPKGConfig(context, version):
      context.Message( 'Checking for pkg-config... ' )
@@ -46,8 +52,11 @@ class Cache:
                    self.allegro_libs = ["allegro_monolith"]
             env = conf.Finish()
 
+        options = " --libs"
+        if static:
+            options += " --static"
         env.ParseConfig("pkg-config " + " ".join([allegro_libname(l)
-            for l in self.allegro_libs]) + " --libs")
+            for l in self.allegro_libs]) + options)
         return env
 
 cache = Cache()
