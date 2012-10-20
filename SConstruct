@@ -7,14 +7,55 @@ def defaultEnvironment():
     env.Append(CCFLAGS = ['-g3', '-Wall'])
     return env
 
-def allegro4Environment():
-    allegro_libs = ["allegro", "allegro_primitives", "allegro_image", "allegro_font", "allegro_audio"]
+def allegro_libname(name):
     allegro_version = "5.1"
-    env = defaultEnvironment()
     if debug:
-        env.ParseConfig("pkg-config " + " ".join([l + "-debug-" + allegro_version for l in allegro_libs]) + " --libs")
+        return name + "-debug-" + allegro_version
     else:
-        env.ParseConfig("pkg-config " + " ".join([l + "-" + allegro_version for l in allegro_libs]) + " --libs")
+        return name + "-" + allegro_version
+
+def CheckPKGConfig(context, version):
+     context.Message( 'Checking for pkg-config... ' )
+     ret = context.TryAction('pkg-config --atleast-pkgconfig-version=%s' % version)[0]
+     context.Result( ret )
+     return ret
+
+def CheckPKG(context, name):
+     context.Message( 'Checking for %s... ' % name )
+     ret = context.TryAction('pkg-config --exists \'%s\'' % name)[0]
+     context.Result( ret )
+     return ret
+
+class Cache:
+    def __init__(self):
+        self.allegro_libs = None
+
+    def get_env(self):
+        env = defaultEnvironment()
+
+        if self.allegro_libs is None:
+            self.allegro_libs = ["allegro", "allegro_primitives",
+                "allegro_image", "allegro_font", "allegro_audio"]
+
+            tests = {
+                "CheckPKGConfig": CheckPKGConfig,
+                "CheckPKG" : CheckPKG}
+            conf = Configure(env, tests)
+            if conf.CheckPKGConfig:
+                if conf.CheckPKG(allegro_libname("allegro_monolith")):
+                   self.allegro_libs = ["allegro_monolith"]
+            env = conf.Finish()
+
+        env.ParseConfig("pkg-config " + " ".join([allegro_libname(l)
+            for l in self.allegro_libs]) + " --libs")
+        return env
+
+cache = Cache()
+
+def allegro4Environment():
+
+    env = cache.get_env()
+
     env.Prepend(LIBS = [allegroLibrary(), 'm'])
     # env.Prepend(LIBS = [allegroLibrary()])
     env.Append(CPPPATH = ['#allegro4'])
