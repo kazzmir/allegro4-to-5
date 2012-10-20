@@ -64,6 +64,7 @@ static bool config_overridden;
 static int config_stack_size;
 int _gfx_mode_set_count;
 int _allegro_count;
+static int color_conversion;
 
 struct{
     int draw_mode;
@@ -392,6 +393,10 @@ static BITMAP * create_bitmap_from(ALLEGRO_BITMAP * real){
         }
         al_unlock_bitmap(real);
     }
+
+    if (color_conversion & COLORCONV_KEEP_TRANS) {
+        al_convert_mask_to_alpha(bitmap->real, al_map_rgb(255, 0, 255));
+    }
     
     return bitmap;
 }
@@ -431,6 +436,7 @@ void set_color_depth(int depth){
 }
 
 void set_color_conversion(int mode){
+    color_conversion = mode;
 }
 
 int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualheight){
