@@ -3,6 +3,7 @@
 
 /* FIXME: not sure if stdlib belongs here */
 #include <stdlib.h>
+#include <allegro5/allegro.h>
 
 #include "include/base.h"
 #include "include/gfx.h"

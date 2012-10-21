@@ -159,45 +159,45 @@ int bestfit_color(AL_CONST PALETTE pal, int r, int g, int b)
 }
 
 
-AL_INLINE(int, makecol15, (int r, int g, int b),
+int makecol15(int r, int g, int b)
 {
    return (((r >> 3) << _rgb_r_shift_15) |
            ((g >> 3) << _rgb_g_shift_15) |
            ((b >> 3) << _rgb_b_shift_15));
-})
+}
 
 
-AL_INLINE(int, makecol16, (int r, int g, int b),
+int makecol16(int r, int g, int b)
 {
    return (((r >> 3) << _rgb_r_shift_16) |
            ((g >> 2) << _rgb_g_shift_16) |
            ((b >> 3) << _rgb_b_shift_16));
-})
+}
 
 
-AL_INLINE(int, makecol24, (int r, int g, int b),
+int makecol24(int r, int g, int b)
 {
    return ((r << _rgb_r_shift_24) |
            (g << _rgb_g_shift_24) |
            (b << _rgb_b_shift_24));
-})
+}
 
 
-AL_INLINE(int, makecol32, (int r, int g, int b),
+int makecol32(int r, int g, int b)
 {
    return ((r << _rgb_r_shift_32) |
            (g << _rgb_g_shift_32) |
            (b << _rgb_b_shift_32));
-})
+}
 
 
-AL_INLINE(int, makeacol32, (int r, int g, int b, int a),
+int makeacol32 (int r, int g, int b, int a)
 {
    return ((r << _rgb_r_shift_32) |
            (g << _rgb_g_shift_32) |
            (b << _rgb_b_shift_32) |
            (a << _rgb_a_shift_32));
-})
+}
 
 int makecol8(int r, int g, int b)
 {

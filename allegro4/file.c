@@ -608,7 +608,7 @@ char *append_filename(char *dest, AL_CONST char *path, AL_CONST char *filename, 
 char *get_filename(char const *path)
 {
    int c;
-   char *ptr, *ret;
+   char const *ptr, *ret;
    ASSERT(path);
 
    ptr = path;
