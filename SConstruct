@@ -14,7 +14,7 @@ def allegro_libname(name):
     if static:
         version = "static-" + allegro_version
     else:
-        version = "allegro-version"
+        version = allegro-version
     if debug:
         return name + "-debug-" + version
     else:
