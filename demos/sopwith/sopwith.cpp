@@ -3836,7 +3836,7 @@ void inc_speed_counter() {
 
 END_OF_FUNCTION( inc_speed_counter );
 
-int main() {
+int main(int argc, char **argv) {
 
         first_init();
         LOCK_VARIABLE( speed_counter );

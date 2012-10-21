@@ -20,7 +20,7 @@
 #include "../include/framewk.h"
 
 
-int main(void)
+int main(int arg, char **argv)
 {
    if (init_framework() != DEMO_OK) {
       return 1;
