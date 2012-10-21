@@ -58,13 +58,17 @@ int current_depth = 8;
 static ALLEGRO_MOUSE_CURSOR *cursor;
 static ALLEGRO_BITMAP *cursor_bitmap;
 static int cursor_x, cursor_y;
-static ALLEGRO_CONFIG *current_config;
-static ALLEGRO_CONFIG **config_stack;
-static bool config_overridden;
+struct CONFIG {
+   ALLEGRO_CONFIG *allegro;
+   char *name;
+};
+static struct CONFIG current_config;
+static struct CONFIG *config_stack;
 static int config_stack_size;
 int _gfx_mode_set_count;
 int _allegro_count;
 static int color_conversion;
+void (*close_button_callback)(void);
 
 struct{
     int draw_mode;
@@ -581,6 +585,7 @@ static void * read_keys(ALLEGRO_THREAD * self, void * arg){
 static void *system_thread(ALLEGRO_THREAD * self, void * arg){
 
     ALLEGRO_EVENT_QUEUE * queue = al_create_event_queue();
+   bool have_display = false;
 
     ALLEGRO_TIMER *timer = al_create_timer(1.0 / 60);
     al_start_timer(timer);
@@ -592,6 +597,16 @@ static void *system_thread(ALLEGRO_THREAD * self, void * arg){
         if (event.type == ALLEGRO_EVENT_TIMER){
             retrace_count++;
         }
+       if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE){
+          if (close_button_callback)
+             close_button_callback();
+       }
+       if (!have_display) {
+          if (display) {
+             have_display = true;
+             al_register_event_source(queue, al_get_display_event_source(display));
+          }
+       }
     }
 
     return NULL;
@@ -635,9 +650,8 @@ int install_allegro(int system_id, int *errno_ptr, int (*atexit_ptr)(void (*func
 
 int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_ptr)(void (*func)(void)), int version){
     int index;
-    ALLEGRO_PATH *path;
     int ok = al_init();
-    current_config = al_create_config();
+    current_config.allegro = al_create_config();
     al_init_primitives_addon();
     al_init_image_addon();
     al_init_font_addon();
@@ -1219,11 +1233,11 @@ void push_config_state(){
     config_stack_size++;
     config_stack = al_realloc(config_stack, config_stack_size * sizeof *config_stack);
     config_stack[config_stack_size - 1] = current_config;
-    current_config = al_create_config();
+    current_config.allegro = al_create_config();
 }
 
 void pop_config_state(){
-    if (current_config) al_destroy_config(current_config);
+    if (current_config.allegro) al_destroy_config(current_config.allegro);
     current_config = config_stack[config_stack_size - 1];
     config_stack_size--;
     config_stack = al_realloc(config_stack, config_stack_size * sizeof *config_stack);
@@ -1231,32 +1245,24 @@ void pop_config_state(){
 
 void override_config_file(AL_CONST char *filename)
 {
-    if (filename) {
-        if (!config_overridden) {
-            config_overridden = true;
-            push_config_state();
-        }
-        set_config_file(filename);
-    }
-    else {
-        if (config_overridden) {
-            config_overridden = false;
-            pop_config_state();
-        }
-    }
+   set_config_file(filename);
 }
 
 void set_config_file(char const *filename){
-    if (current_config) al_destroy_config(current_config);
-    current_config = al_load_config_file(filename);
-    if (!current_config) current_config = al_create_config();
+    if (current_config.allegro) al_destroy_config(current_config.allegro);
+    current_config.allegro = al_load_config_file(filename);
+    if (!current_config.allegro) current_config.allegro = al_create_config();
+   if (current_config.name) free(current_config.name);
+   current_config.name = strdup(filename);
 }
 
 void set_config_string(AL_CONST char *section, AL_CONST char *name, AL_CONST char *val)
 {
-    if (!current_config)
+    if (!current_config.allegro)
         return;
-   al_set_config_value(current_config, section, name, val);
+   al_set_config_value(current_config.allegro, section, name, val);
+   if (current_config.name)
+      al_save_config_file(current_config.name, current_config.allegro);
 }
 
 static char _tokens[64][64];
@@ -1264,7 +1270,7 @@ static char *tokens[64];
 char **get_config_argv(char const *section, char const *name, int *argc){
     char const *v;
     int i, pos = 0;
-    v = al_get_config_value(current_config, section, name);
+    v = al_get_config_value(current_config.allegro, section, name);
     *argc = 0;
     _tokens[0][0] = 0;
     tokens[0] = _tokens[0];
@@ -1287,15 +1293,15 @@ char **get_config_argv(char const *section, char const *name, int *argc){
 }
 
 char const *get_config_string(char const *section, char const *name, char const *def){
-    char const *v = al_get_config_value(current_config, section, name);
+    char const *v = al_get_config_value(current_config.allegro, section, name);
     if (!v) return def;
     return v;
 }
 
 int get_config_int(char const *section, char const *name, int def){
-    char const *v = al_get_config_value(current_config, section, name);
+    char const *v = al_get_config_value(current_config.allegro, section, name);
     if (!v) return def;
-    return strtol(v, NULL, 10);
+    return (int)strtol(v, NULL, 10);
 }
 
 unsigned int _default_ds(){
@@ -1423,7 +1429,9 @@ void set_keyboard_rate(int delay, int repeat){
 }
 
 void set_config_int(AL_CONST char *section, AL_CONST char *name, int val){
-    /* FIXME */
+   char sval[1024];
+   snprintf(sval, sizeof val, "%d", val);
+   set_config_string(section, name, sval);
 }
 
 int show_os_cursor(int cursor){
@@ -1433,7 +1441,7 @@ int show_os_cursor(int cursor){
 
 int desktop_color_depth(void){
     /* FIXME */
-    return -1;
+    return 32;
 }
 
 void voice_start(int voice){
@@ -1492,8 +1500,8 @@ int set_display_switch_mode(int mode){
 
 
 int set_close_button_callback(void (*proc)(void)){
-    /* FIXME */
-    return -1;
+   close_button_callback = proc;
+    return 0;
 }
 
 void set_window_title(AL_CONST char *name){
