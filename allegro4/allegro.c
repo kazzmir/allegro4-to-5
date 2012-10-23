@@ -3,9 +3,11 @@
 #include "allegro.h"
 
 /* FIXME */
+/*
 int AL_RAND(){
     return rand();
 }
+*/
 
 #include <allegro5/allegro5.h>
 #include <allegro5/allegro_primitives.h>
