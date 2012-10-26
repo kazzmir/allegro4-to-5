@@ -3,7 +3,20 @@
 
 /* FIXME: not sure if stdlib belongs here */
 #include <stdlib.h>
+
+#define BITMAP WIN32BITMAP
 #include <allegro5/allegro.h>
+
+#ifdef ALLEGRO_WINDOWS
+#include <allegro5/allegro_windows.h>
+#endif
+
+#undef BITMAP
+
+#undef AL_FUNC
+#undef AL_VAR
+#undef AL_FUNCPTR
+#undef AL_ARRAY
 
 #include "include/base.h"
 #include "include/gfx.h"

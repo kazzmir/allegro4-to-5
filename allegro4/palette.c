@@ -1,7 +1,7 @@
-#include <allegro5/allegro.h>
-
 #include "allegro.h"
 #include "include/internal/aintern.h"
+
+#include <allegro5/allegro.h>
 
 void set_palette(const PALETTE palette){
     memcpy(current_palette, palette, sizeof(PALETTE));

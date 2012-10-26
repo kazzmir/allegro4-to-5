@@ -27,9 +27,10 @@
 #include <limits.h>
 #include <stdlib.h>
 
-#include <allegro5/allegro.h>
 #include "allegro.h"
 #include "include/internal/aintern.h"
+
+#include <allegro5/allegro.h>
 
 
 int gui_fg_color = 255;

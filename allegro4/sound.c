@@ -1,9 +1,9 @@
+#include "allegro.h"
+#include "include/internal/aintern.h"
+
 #include <allegro5/allegro.h>
 #include <allegro5/allegro_audio.h>
 #include <allegro5/allegro_acodec.h>
-
-#include "allegro.h"
-#include "include/internal/aintern.h"
 
 /* allegro4 uses 0 as ok values */
 static int is_ok(int code){

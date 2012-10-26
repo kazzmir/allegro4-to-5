@@ -28,9 +28,9 @@
 #include <string.h>
 #include <stdio.h>
 
-#include <allegro5/allegro5.h>
 #include "allegro.h"
 #include "include/internal/aintern.h"
+#include <allegro5/allegro5.h>
 
 /* this is a valid encoding in any of the supported formats */
 char empty_string[] = EMPTY_STRING;

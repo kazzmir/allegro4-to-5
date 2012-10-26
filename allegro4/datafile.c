@@ -20,12 +20,11 @@
 
 #include <string.h>
 
-#include <allegro5/allegro.h>
-#include <allegro5/allegro_font.h>
-
 #include "allegro.h"
 #include "include/internal/aintern.h"
 
+#include <allegro5/allegro.h>
+#include <allegro5/allegro_font.h>
 
 
 static void unload_midi(MIDI *m);

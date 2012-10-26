@@ -28,11 +28,11 @@
 #include <string.h>
 #include <limits.h>
 
-#include <allegro5/allegro.h>
-#include <allegro5/path.h>
-
 #include "allegro.h"
 #include "include/internal/aintern.h"
+
+#include <allegro5/allegro.h>
+#include <allegro5/path.h>
 
 /* replace_filename:
  *  Replaces filename in path with different one.
@@ -72,10 +72,6 @@ char *replace_filename(char *dest, AL_CONST char *path, AL_CONST char *filename,
 
 #ifdef ALLEGRO_UNIX
    #include <pwd.h>                 /* for tilde expansion */
-#endif
-
-#ifdef ALLEGRO_WINDOWS
-   #include "winalleg.h" /* for GetTempPath */
 #endif
 
 #ifndef O_BINARY

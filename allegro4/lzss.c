@@ -16,11 +16,10 @@
  *
  *      See readme.txt for copyright information.
  */
-
-#include <allegro5/allegro.h>
-
 #include "allegro.h"
 #include "include/internal/aintern.h"
+
+#include <allegro5/allegro.h>
 
 
 /*

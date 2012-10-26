@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <allegro5/allegro5.h>
-#include <allegro5/allegro_font.h>
-
 #include "allegro.h"
 #include "include/internal/aintern.h"
+
+#include <allegro5/allegro5.h>
+#include <allegro5/allegro_font.h>
 
 /* color_get_font_ranges:
  *  (color vtable entry)

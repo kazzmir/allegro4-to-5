@@ -15,12 +15,10 @@
  *      See readme.txt for copyright information.
  */
 
+#include "allegro.h"
 
 #include <math.h>
 #include <allegro5/allegro.h>
-#include "allegro.h"
-
-
 
 #define FLOATSINCOS(x, s, c)  _AL_SINCOS((x) * AL_PI / 128.0, s ,c)
 
