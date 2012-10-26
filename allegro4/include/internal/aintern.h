@@ -232,21 +232,12 @@ AL_VAR(char *, _keyboard_layout);
 
 #endif
 
-#if (defined ALLEGRO_WINDOWS)
 
-   AL_FUNC(int, _al_win_open, (const char *filename, int mode, int perm));
-   AL_FUNC(int, _al_win_unlink, (const char *filename));
-
-
-   #define _al_open(filename, mode, perm)   _al_win_open(filename, mode, perm)
-   #define _al_unlink(filename)             _al_win_unlink(filename)
-
-#else
 
    #define _al_open(filename, mode, perm)   open(filename, mode, perm)
    #define _al_unlink(filename)             unlink(filename)
 
-#endif
+
 
 
 /* various bits of joystick stuff */
