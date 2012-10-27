@@ -1741,8 +1741,9 @@ int pack_fclose(PACKFILE *f)
 PACKFILE *pack_fopen_chunk(PACKFILE *f, int pack)
 {
    PACKFILE *chunk;
-   char tmp[1024];
+   char tmp[PATH_MAX];
    char *name;
+   static int unique = 0;
    ASSERT(f);
 
    /* unsupported */
@@ -1755,81 +1756,21 @@ PACKFILE *pack_fopen_chunk(PACKFILE *f, int pack)
 
       /* write a sub-chunk */ 
       int tmp_fd = -1;
-      char *tmp_dir = NULL;
-      char *tmp_name = NULL;
-      #ifndef ALLEGRO_HAVE_MKSTEMP
-      char* tmpnam_string;
-      #endif
-
-      #ifdef ALLEGRO_WINDOWS
-         int size;
-         int new_size = 64;
-         
-         /* Get the path of the temporary directory */
-         do {
-            size = new_size;
-            tmp_dir = _AL_REALLOC(tmp_dir, size);
-            new_size = GetTempPath(size, tmp_dir);
-         } while ( (size < new_size) && (new_size > 0) );
-         
-         /* Check if we retrieved the path OK */
-         if (new_size == 0)
-            sprintf(tmp_dir, "%s", "");
-      #else
-         /* Get the path of the temporary directory */
-
-         /* Try various possible locations to store the temporary file */
-         if (getenv("TEMP")) {
-            tmp_dir = _al_strdup(getenv("TEMP"));
-         }
-         else if (getenv("TMP")) {
-            tmp_dir = _al_strdup(getenv("TMP"));
-         }
-         else if (file_exists("/tmp", FA_DIREC, NULL)) {
-            tmp_dir = _al_strdup("/tmp");
-         }
-         else if (getenv("HOME")) {
-            tmp_dir = _al_strdup(getenv("HOME"));
-         }
-         else {
-            /* Give up - try current directory */
-            tmp_dir = _al_strdup(".");
-         }
-
-      #endif
-
-      /* the file is open in read/write mode, even if the pack file
-       * seems to be in write only mode
-       */
-      #ifdef ALLEGRO_HAVE_MKSTEMP
-
-         tmp_name = _AL_MALLOC_ATOMIC(strlen(tmp_dir) + 16);
-         sprintf(tmp_name, "%s/XXXXXX", tmp_dir);
-         tmp_fd = mkstemp(tmp_name);
-
-      #else
-
-         /* note: since the filename creation and the opening are not
-          * an atomic operation, this is not secure
-          */
-         tmpnam_string = tmpnam(NULL);
-         tmp_name = _AL_MALLOC_ATOMIC(strlen(tmp_dir) + strlen(tmpnam_string) + 2);
-         sprintf(tmp_name, "%s/%s", tmp_dir, tmpnam_string);
-
-         if (tmp_name) {
-#ifndef ALLEGRO_MPW
-            tmp_fd = open(tmp_name, O_RDWR | O_BINARY | O_CREAT | O_EXCL, OPEN_PERMS);
-#else
-            tmp_fd = _al_open(tmp_name, O_RDWR | O_BINARY | O_CREAT | O_EXCL);
-#endif
-         }
-
-      #endif
-
-      if (tmp_fd < 0) {
-         _AL_FREE(tmp_dir);
-         _AL_FREE(tmp_name);
+      char unique_name[100];
+   existed:
+      snprintf(unique_name, sizeof unique_name, "chunk_%d", unique++);
       
+      ALLEGRO_PATH *temp_path = al_get_standard_path(ALLEGRO_TEMP_PATH);
+      al_set_path_filename(temp_path, unique_name);
+      char const *tmp_name = al_path_cstr(temp_path, '/');
+      if (exists(tmp_name)) {
+         al_destroy_path(temp_path);
+         goto existed;
+      }
+      tmp_fd = open(tmp_name, O_RDWR | O_BINARY | O_CREAT);
+         
+      if (tmp_fd < 0) {
+         al_destroy_path(temp_path);
          return NULL;
       }
 
@@ -1847,8 +1788,7 @@ PACKFILE *pack_fopen_chunk(PACKFILE *f, int pack)
          chunk->normal.flags |= PACKFILE_FLAG_CHUNK;
       }
       
-      _AL_FREE(tmp_dir);
-      _AL_FREE(tmp_name);
+      al_destroy_path(temp_path);
    }
    else {
       /* read a sub-chunk */
