@@ -1424,6 +1424,14 @@ int is_video_bitmap(BITMAP * what){
     return 1;
 }
 
+void rotate_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y, fixed angle){
+    pivot_sprite(bmp, sprite, x + sprite->w/2, y + sprite->h/2, sprite->w/2, sprite->h/2, angle);
+}
+
+void rotate_sprite_v_flip(BITMAP *bmp, BITMAP *sprite, int x, int y, fixed angle) {
+    pivot_sprite_v_flip(bmp, sprite, x + sprite->w/2, y + sprite->h/2, sprite->w/2, sprite->h/2, angle);
+}
+
 void rotate_scaled_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y, fixed angle, fixed scale){
     /* FIXME */
 }
