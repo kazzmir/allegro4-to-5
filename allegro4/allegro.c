@@ -368,7 +368,7 @@ static void lazily_create_real_font(FONT *font){
     for (j = 0; j < ranges_count; j++){
         int count = 1 + ranges[j * 2 + 1] - ranges[j * 2];
         for (i = 0; i < count; i++) {
-            lazily_create_real_bitmap(color_iterator->bitmaps[i], 1);
+            lazily_create_real_bitmap(color_iterator->bitmaps[i], is_mono_font(font));
             al_draw_bitmap(color_iterator->bitmaps[i]->real, x, 1, 0);
             x += color_iterator->bitmaps[i]->w + 1;
         }
