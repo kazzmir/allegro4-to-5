@@ -918,6 +918,14 @@ void draw_lit_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y, in
     al_destroy_bitmap(temp);
 }
 
+static ALLEGRO_COLOR text_color(int color, int current_depth){
+    if (color == -1) {
+        return al_map_rgb(255, 255, 255);
+    } else {
+        return a5color(color, current_depth);
+    }
+}
+
 void textprintf_ex(struct BITMAP *bmp, struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
     char buffer[65536];
     va_list args;
@@ -935,7 +943,7 @@ void textout_centre_ex(struct BITMAP *bmp, struct FONT *f, AL_CONST char *str, i
         al_draw_filled_rectangle(x - w / 2, y, x + w - w / 2,
             y + al_get_font_line_height(f->real), a5color(bg, current_depth));
     }
-    al_draw_text(f->real, a5color(color, current_depth), x, y, ALLEGRO_ALIGN_CENTRE, str);
+    al_draw_text(f->real, text_color(color, current_depth), x, y, ALLEGRO_ALIGN_CENTRE, str);
 }
 
 void textout_right_ex(struct BITMAP *bmp, struct FONT *f, AL_CONST char *str, int x, int y, int color, int bg){
@@ -946,7 +954,7 @@ void textout_right_ex(struct BITMAP *bmp, struct FONT *f, AL_CONST char *str, in
         al_draw_filled_rectangle(x - w / 2, y, x + w - w / 2,
             y + al_get_font_line_height(f->real), a5color(bg, current_depth));
     }
-    al_draw_text(f->real, a5color(color, current_depth), x, y, ALLEGRO_ALIGN_RIGHT, str);
+    al_draw_text(f->real, text_color(color, current_depth), x, y, ALLEGRO_ALIGN_RIGHT, str);
 }
 
 void textprintf_right_ex(struct BITMAP *bmp, struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
@@ -974,7 +982,7 @@ void textout_ex(struct BITMAP *bmp, struct FONT *f, AL_CONST char *str, int x, i
         al_draw_filled_rectangle(x, y, x + al_get_text_width(f->real, str),
             y + al_get_font_line_height(f->real), a5color(bg, current_depth));
     }
-    al_draw_text(f->real, a5color(color, current_depth), x, y, 0, str);
+    al_draw_text(f->real, text_color(color, current_depth), x, y, 0, str);
 
     maybe_flip_screen(bmp);
 }
