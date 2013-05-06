@@ -887,16 +887,20 @@ void draw_sprite_vh_flip(BITMAP *bmp, BITMAP *sprite, int x, int y){
     al_draw_bitmap(sprite->real, x, y, ALLEGRO_FLIP_HORIZONTAL | ALLEGRO_FLIP_VERTICAL);
 }
 
+static float radians(fixed angle){
+    return fixtof(angle) * ALLEGRO_PI / 128.0;
+}
+
 void pivot_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y, int cx, int cy, fixed angle){
     draw_into(bmp);
     lazily_create_real_bitmap(sprite, 0);
-    al_draw_rotated_bitmap(sprite->real, cx, cy, x, y, angle * ALLEGRO_PI / 65536.0 / 256.0, 0);
+    al_draw_rotated_bitmap(sprite->real, cx, cy, x, y, radians(angle), 0);
 }
 
 void pivot_sprite_v_flip(BITMAP *bmp, BITMAP *sprite, int x, int y, int cx, int cy, fixed angle){
     draw_into(bmp);
     lazily_create_real_bitmap(sprite, 0);
-    al_draw_rotated_bitmap(sprite->real, cx, cy, x, y, angle * ALLEGRO_PI / 65536.0 / 256.0, ALLEGRO_FLIP_VERTICAL);
+    al_draw_rotated_bitmap(sprite->real, cx, cy, x, y, radians(angle), ALLEGRO_FLIP_VERTICAL);
 }
 
 void draw_lit_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y, int a){
