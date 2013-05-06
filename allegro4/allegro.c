@@ -113,6 +113,11 @@ int _rgb_scale_6[64] =
    227, 231, 235, 239, 243, 247, 251, 255
 };
 
+
+/* forward declarations */
+static void lazily_create_real_bitmap(BITMAP *bitmap, int is_mono_font);
+
+
 /* allegro4 uses 0 as ok values */
 static int is_ok(int code){
     if (code){
@@ -195,19 +200,34 @@ void get_mouse_mickeys(int *x, int *y){
     mickey_y = mouse_y;
 }
 
-void set_mouse_sprite(BITMAP *sprite){
+static void set_mouse_sprite_real(ALLEGRO_BITMAP *sprite){
     if (cursor) al_destroy_mouse_cursor(cursor);
-    cursor_bitmap = sprite->real;
-    cursor = al_create_mouse_cursor(cursor_bitmap, cursor_x, cursor_y);
-    al_set_mouse_cursor(display, cursor);
+    if (sprite) {
+        cursor_bitmap = sprite;
+        cursor = al_create_mouse_cursor(cursor_bitmap, cursor_x, cursor_y);
+        al_set_mouse_cursor(display, cursor);
+        al_show_mouse_cursor(display);
+    } else {
+        cursor_bitmap = NULL;
+        cursor = NULL;
+        al_set_system_mouse_cursor(display, ALLEGRO_SYSTEM_MOUSE_CURSOR_DEFAULT);
+        al_hide_mouse_cursor(display);
+    }
+}
+
+void set_mouse_sprite(BITMAP *sprite){
+    if (sprite) {
+        lazily_create_real_bitmap(sprite, FALSE);
+        set_mouse_sprite_real(sprite->real);
+    } else {
+        set_mouse_sprite_real(NULL);
+    }
 }
 
 void set_mouse_sprite_focus(int x, int y){
-    if (cursor) al_destroy_mouse_cursor(cursor);
     cursor_x = x;
     cursor_y = y;
-    cursor = al_create_mouse_cursor(cursor_bitmap, cursor_x, cursor_y);
-    al_set_mouse_cursor(display, cursor);
+    set_mouse_sprite_real(cursor_bitmap);
 }
 
 int keypressed(){
