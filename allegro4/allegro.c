@@ -811,16 +811,16 @@ static void maybe_flip_screen(BITMAP * where){
 void stretch_blit(BITMAP *source, BITMAP *dest, int source_x,
     int source_y, int source_width, int source_height, int dest_x,
     int dest_y, int dest_width, int dest_height){
-        
+
     lazily_create_real_bitmap(source, 0);
     lazily_create_real_bitmap(dest, 0);
-        
+
     ALLEGRO_BITMAP * al_from = source->real;
     ALLEGRO_BITMAP * al_to = dest->real;
-    
+
     if (al_is_bitmap_locked(al_from))
         al_unlock_bitmap(al_from);
-    
+
     /* A4 allows drawing a bitmap to itself, A5 does not. */
     if (al_from == al_to) {
         ALLEGRO_BITMAP *temp = al_create_bitmap(source_width, source_height);
@@ -834,18 +834,17 @@ void stretch_blit(BITMAP *source, BITMAP *dest, int source_x,
         al_set_target_bitmap(al_to);
         if (blender.draw_mode == DRAW_MODE_TRANS){
             ALLEGRO_COLOR tint = al_map_rgba(blender.color.r,
-            blender.color.g, blender.color.b, blender.color.a);
+                blender.color.g, blender.color.b, blender.color.a);
             al_draw_tinted_scaled_bitmap(al_from, tint, source_x, source_y,
                 source_width,
                 source_height, dest_x, dest_y, dest_width, dest_height, 0);
-     }
-     else{
+        } else {
             al_draw_scaled_bitmap(al_from, source_x, source_y,
                 source_width,
                 source_height, dest_x, dest_y, dest_width, dest_height, 0);
         }
     }
- 
+
     maybe_flip_screen(dest);
 }
 
