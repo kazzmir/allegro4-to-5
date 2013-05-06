@@ -44,7 +44,7 @@ MOUSE_DRIVER _mouse_driver = {0, "A5", "A5", "A5"};
 MOUSE_DRIVER *mouse_driver = &_mouse_driver;
 TIMER_DRIVER _timer_driver = {0, "A5", "A5", "A5"};
 TIMER_DRIVER *timer_driver = &_timer_driver;
-GFX_DRIVER _gfx_driver = {0, "A5", "A5", "A5"};
+GFX_DRIVER _gfx_driver = {0, "A5", "A5", "A5", 0, 0, 0, 0, 0, 0, 0, 0};
 GFX_DRIVER *gfx_driver = &_gfx_driver;
 void (*keyboard_lowlevel_callback)(int scancode);
 BITMAP * screen;
