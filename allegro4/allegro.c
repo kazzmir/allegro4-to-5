@@ -297,17 +297,17 @@ static void convert_8bit(BITMAP * bitmap, int is_mono_font){
         int x, y;
         ALLEGRO_LOCKED_REGION *lock = al_lock_bitmap(bitmap->real,
                                                      ALLEGRO_PIXEL_FORMAT_ABGR_8888_LE, ALLEGRO_LOCK_WRITEONLY);
-        char *rgba = lock->data;
+        unsigned char *rgba = lock->data;
         for (y = 0; y < bitmap->h; y++){
             for (x = 0; x < bitmap->w; x++){
                 int c = *(bitmap->line[y] + x);
                 unsigned char red = current_palette[c].r * 4;
                 unsigned char green = current_palette[c].g * 4;
                 unsigned char blue = current_palette[c].b * 4;
-                char alpha = 255;
+                unsigned char alpha = 255;
                 if (c == 0) {
                     red = green = blue = alpha = 0;
-                } else if (is_mono_font && c){
+                } else if (is_mono_font) {
                     red = green = blue = 255;
                 }
                 rgba[y * lock->pitch + x * 4 + 0] = red;
