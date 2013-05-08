@@ -14,7 +14,11 @@ static int is_ok(int code){
 }
 
 int install_sound(int digi, int midi, AL_CONST char *cfg_path){
-    return al_install_audio() && al_init_acodec_addon();
+    if (al_install_audio() && al_init_acodec_addon()) {
+        return 0;
+    } else {
+        return -1;
+    }
 }
 
 void release_voice(int voice){
