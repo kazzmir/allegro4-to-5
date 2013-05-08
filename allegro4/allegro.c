@@ -653,7 +653,6 @@ static void * read_keys(ALLEGRO_THREAD * self, void * arg){
             }
 
             if (keyboard_lowlevel_callback) {
-                al_set_target_backbuffer(display);
                 keyboard_lowlevel_callback(k);
             }
         } else if (event.type == ALLEGRO_EVENT_KEY_UP){
@@ -663,7 +662,6 @@ static void * read_keys(ALLEGRO_THREAD * self, void * arg){
                 key_shifts &= ~KB_SHIFT_FLAG;
             }
             if (keyboard_lowlevel_callback) {
-                al_set_target_backbuffer(display);
                 keyboard_lowlevel_callback(k + 128);
             }
         } else if (event.type == ALLEGRO_EVENT_KEY_CHAR){
