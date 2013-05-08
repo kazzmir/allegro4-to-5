@@ -33,9 +33,14 @@ char allegro_id[] = "Allegro 4 to 5 Layer Version 0.1";
 char allegro_error[ALLEGRO_ERROR_SIZE];
 
 volatile char key[KEY_MAX];
-static volatile KEYBUFFER_ENTRY keybuffer[KEYBUFFER_LENGTH];
-static volatile int keybuffer_pos;
+static KEYBUFFER_ENTRY keybuffer[KEYBUFFER_LENGTH];
+static int keybuffer_pos;
 volatile int key_shifts;
+static ALLEGRO_MUTEX *keybuffer_mutex;
+static ALLEGRO_COND *keybuffer_cond;
+static ALLEGRO_EVENT_SOURCE keybuffer_event_source;
+const unsigned USER_EVENT_CLEAR_KEYBUF = ALLEGRO_GET_EVENT_TYPE('4','C','K','B');
+
 SYSTEM_DRIVER _system_driver = {0, "A5", "A5", "A5"};
 SYSTEM_DRIVER *system_driver = &_system_driver;
 KEYBOARD_DRIVER _keyboard_driver = {0, "A5", "A5", "A5", 0};
@@ -231,17 +236,27 @@ void set_mouse_sprite_focus(int x, int y){
 }
 
 int keypressed(){
-    return keybuffer_pos > 0;
+    int ret;
+    al_lock_mutex(keybuffer_mutex);
+    ret = (keybuffer_pos > 0);
+    al_unlock_mutex(keybuffer_mutex);
+    return ret;
 }
 
 int ureadkey(int *scancode){
-    while (keybuffer_pos == 0)
-        al_rest(0.1);
+    int ret;
+
+    al_lock_mutex(keybuffer_mutex);
+    while (keybuffer_pos == 0) {
+        al_wait_cond(keybuffer_cond, keybuffer_mutex);
+    }
     keybuffer_pos--;
     if (scancode) *scancode = keybuffer[keybuffer_pos].keycode;
     /* FIXME: not sure if the key_shifts should be updated here */
     key_shifts = keybuffer[keybuffer_pos].modifiers;
-    return keybuffer[keybuffer_pos].unicode;
+    ret = keybuffer[keybuffer_pos].unicode;
+    al_unlock_mutex(keybuffer_mutex);
+    return ret;
 }
 
 int readkey(){
@@ -251,16 +266,30 @@ int readkey(){
 }
 
 void clear_keybuf(){
-    keybuffer_pos = 0;
+    al_lock_mutex(keybuffer_mutex);
+    {
+        ALLEGRO_EVENT ev;
+        ev.type = USER_EVENT_CLEAR_KEYBUF;
+        al_emit_user_event(&keybuffer_event_source, &ev, NULL);
+        /* Always wait for a response, even if keybuffer_pos is initially zero.
+         * There may be unprocessed KEY_CHAR events already in the queue.
+         */
+        do {
+            al_wait_cond(keybuffer_cond, keybuffer_mutex);
+        } while (keybuffer_pos != 0);
+    }
+    al_unlock_mutex(keybuffer_mutex);
 }
 
 void simulate_keypress(int k){
+    al_lock_mutex(keybuffer_mutex);
     if (keybuffer_pos < KEYBUFFER_LENGTH) {
         keybuffer[keybuffer_pos].unicode = k & 255;
         keybuffer[keybuffer_pos].keycode = k >> 8;
         keybuffer[keybuffer_pos].modifiers = 0;
         keybuffer_pos++;
     }
+    al_unlock_mutex(keybuffer_mutex);
 }
 
 void rest(unsigned int milliseconds){
@@ -611,6 +640,7 @@ static void * read_keys(ALLEGRO_THREAD * self, void * arg){
     ALLEGRO_EVENT_QUEUE * queue = al_create_event_queue();
     al_register_event_source(queue, al_get_keyboard_event_source());
     al_register_event_source(queue, al_get_mouse_event_source());
+    al_register_event_source(queue, &keybuffer_event_source);
 
     while (true){
         ALLEGRO_EVENT event;
@@ -637,13 +667,21 @@ static void * read_keys(ALLEGRO_THREAD * self, void * arg){
                 keyboard_lowlevel_callback(k + 128);
             }
         } else if (event.type == ALLEGRO_EVENT_KEY_CHAR){
+            al_lock_mutex(keybuffer_mutex);
             if (keybuffer_pos < KEYBUFFER_LENGTH) {
                 keybuffer[keybuffer_pos].unicode = event.keyboard.unichar;
                 keybuffer[keybuffer_pos].keycode = event.keyboard.keycode;
                 /* FIXME: handle the rest of the modifiers */
                 keybuffer[keybuffer_pos].modifiers = (event.keyboard.modifiers & ALLEGRO_KEYMOD_SHIFT) ? KB_SHIFT_FLAG : 0;
                 keybuffer_pos++;
+                al_broadcast_cond(keybuffer_cond);
             }
+            al_unlock_mutex(keybuffer_mutex);
+        } else if (event.type == USER_EVENT_CLEAR_KEYBUF) {
+            al_lock_mutex(keybuffer_mutex);
+            keybuffer_pos = 0;
+            al_broadcast_cond(keybuffer_cond);
+            al_unlock_mutex(keybuffer_mutex);
         } else if (event.type == ALLEGRO_EVENT_MOUSE_AXES){
             mouse_w = event.mouse.w;
             mouse_x = event.mouse.x;
@@ -690,7 +728,13 @@ static void *system_thread(ALLEGRO_THREAD * self, void * arg){
 }
 
 static void start_key_thread(){
-    ALLEGRO_THREAD * thread = al_create_thread(read_keys, NULL);
+    ALLEGRO_THREAD * thread;
+
+    /* XXX never cleaned up */
+    keybuffer_mutex = al_create_mutex();
+    keybuffer_cond = al_create_cond();
+    al_init_user_event_source(&keybuffer_event_source);
+    thread = al_create_thread(read_keys, NULL);
     if (thread != NULL){
         al_start_thread(thread);
     } else {
