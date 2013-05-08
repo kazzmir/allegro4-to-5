@@ -324,6 +324,10 @@ static void convert_8bit_inner(BITMAP * bitmap, CONVERT_8BIT mode, ALLEGRO_COLOR
                             alpha = 255;
                         }
                         break;
+                    case CONVERT_8BIT_INTENSITY:
+                        red = green = blue = c;
+                        alpha = 255;
+                        break;
                     case CONVERT_8BIT_MONO_FONT:
                         if (c == 0) {
                             red = repl[0];
