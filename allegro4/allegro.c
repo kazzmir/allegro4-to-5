@@ -853,8 +853,6 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     al_init_primitives_addon();
     al_init_image_addon();
     al_init_font_addon();
-    al_install_audio();
-    al_reserve_samples(10);
     al_install_keyboard();
     al_install_mouse();
     // al_set_new_bitmap_flags(ALLEGRO_MEMORY_BITMAP);
