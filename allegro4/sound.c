@@ -5,6 +5,8 @@
 #include <allegro5/allegro_audio.h>
 #include <allegro5/allegro_acodec.h>
 
+static int digi_reserve = -1;             /* how many voices to reserve */
+
 /* allegro4 uses 0 as ok values */
 static int is_ok(int code){
     if (code){
@@ -13,8 +15,16 @@ static int is_ok(int code){
     return -1;
 }
 
+void reserve_voices(int digi_voices, int midi_voices){
+    digi_reserve = digi_voices;
+}
+
 int install_sound(int digi, int midi, AL_CONST char *cfg_path){
     if (al_install_audio() && al_init_acodec_addon()) {
+        if (digi_reserve >= 0)
+            al_reserve_samples(digi_reserve);
+        else
+            al_reserve_samples(MIXER_DEF_SFX);
         return 0;
     } else {
         return -1;
