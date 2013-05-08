@@ -45,6 +45,7 @@
 #include "include/system.h"
 #include "include/timer.h"
 #include "include/quat.h"
+#include "include/extensions.h"
 
 #ifdef __cplusplus
    extern "C" {

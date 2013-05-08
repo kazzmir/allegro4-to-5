@@ -292,23 +292,51 @@ void create_rgb_table(RGB_MAP *table, AL_CONST PALETTE pal, AL_METHOD(void, call
 void create_light_table(COLOR_MAP *table, AL_CONST PALETTE pal, int r, int g, int b, AL_METHOD(void, callback, (int pos))){
 }
 
-static void convert_8bit(BITMAP * bitmap, int is_mono_font){
+static void convert_8bit_inner(BITMAP * bitmap, CONVERT_8BIT mode, ALLEGRO_COLOR replace){
     if (bitmap->depth == 8){
         int x, y;
         ALLEGRO_LOCKED_REGION *lock = al_lock_bitmap(bitmap->real,
                                                      ALLEGRO_PIXEL_FORMAT_ABGR_8888_LE, ALLEGRO_LOCK_WRITEONLY);
         unsigned char *rgba = lock->data;
+        unsigned char repl[4];
+        al_unmap_rgba(replace, &repl[0], &repl[1], &repl[2], &repl[3]);
         for (y = 0; y < bitmap->h; y++){
             for (x = 0; x < bitmap->w; x++){
                 int c = *(bitmap->line[y] + x);
-                unsigned char red = current_palette[c].r * 4;
-                unsigned char green = current_palette[c].g * 4;
-                unsigned char blue = current_palette[c].b * 4;
-                unsigned char alpha = 255;
-                if (c == 0) {
-                    red = green = blue = alpha = 0;
-                } else if (is_mono_font) {
-                    red = green = blue = 255;
+                unsigned char red, green, blue, alpha;
+                switch (mode) {
+                    case CONVERT_8BIT_PALETTE:
+                        red = _rgb_scale_6[current_palette[c].r];
+                        green = _rgb_scale_6[current_palette[c].g];
+                        blue = _rgb_scale_6[current_palette[c].b];
+                        alpha = 255;
+                        break;
+                    case CONVERT_8BIT_PALETTE_REPLACE_INDEX0:
+                        if (c == 0) {
+                            red = repl[0];
+                            green = repl[1];
+                            blue = repl[2];
+                            alpha = repl[3];
+                        } else {
+                            red = _rgb_scale_6[current_palette[c].r];
+                            green = _rgb_scale_6[current_palette[c].g];
+                            blue = _rgb_scale_6[current_palette[c].b];
+                            alpha = 255;
+                        }
+                        break;
+                    case CONVERT_8BIT_MONO_FONT:
+                        if (c == 0) {
+                            red = repl[0];
+                            green = repl[1];
+                            blue = repl[2];
+                            alpha = repl[3];
+                        } else {
+                            red = green = blue = alpha = 255;
+                        }
+                        break;
+		    default:
+			red = green = blue = alpha = 0;
+			break;
                 }
                 rgba[y * lock->pitch + x * 4 + 0] = red;
                 rgba[y * lock->pitch + x * 4 + 1] = green;
@@ -320,10 +348,20 @@ static void convert_8bit(BITMAP * bitmap, int is_mono_font){
     }
 }
 
+void convert_8bit(BITMAP *bitmap, CONVERT_8BIT mode, ALLEGRO_COLOR c){
+    al_destroy_bitmap(bitmap->real);
+    bitmap->real = al_create_bitmap(bitmap->w, bitmap->h);
+    convert_8bit_inner(bitmap, mode, c);
+}
+
 static void lazily_create_real_bitmap(BITMAP *bitmap, int is_mono_font){
     if (bitmap->real == NULL){
-        bitmap->real = al_create_bitmap(bitmap->w, bitmap->h);
-        convert_8bit(bitmap, is_mono_font);
+        CONVERT_8BIT mode;
+        if (is_mono_font)
+            mode = CONVERT_8BIT_MONO_FONT;
+        else
+            mode = CONVERT_8BIT_PALETTE_REPLACE_INDEX0;
+        convert_8bit(bitmap, mode, al_map_rgba(0, 0, 0, 0));
     }
 }
 
