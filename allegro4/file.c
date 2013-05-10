@@ -532,6 +532,7 @@ int get_filename_encoding(void)
  */
 int file_exists(AL_CONST char *filename, int attrib, int *aret)
 {
+   struct al_ffblk info;
    ASSERT(filename);
 
    if (ustrchr(filename, '#')) {
@@ -547,17 +548,18 @@ int file_exists(AL_CONST char *filename, int attrib, int *aret)
    if (!_al_file_isok(filename))
       return FALSE;
 
-   ALLEGRO_FS_ENTRY *e = al_create_fs_entry(filename);
-   
-   if (!al_fs_entry_exists(e)) {
-       al_destroy_fs_entry(e);
-       return FALSE;
+   if (al_findfirst(filename, &info, attrib) != 0) {
+      /* no entry is not an error for file_exists() */
+      if (*allegro_errno == ENOENT)
+         *allegro_errno = 0;
+
+      return FALSE;
    }
 
+   al_findclose(&info);
+
    if (aret)
-      *aret = al_get_fs_entry_mode(e);
-      
-   al_destroy_fs_entry(e);
+      *aret = info.attrib;
 
    return TRUE;
 }
