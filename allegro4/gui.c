@@ -77,6 +77,7 @@ static struct al_active_dialog_player *current_active_dialog_player = 0;
 
 
 /* forward declarations */
+static int update_dialog_held(DIALOG_PLAYER *player);
 static int shutdown_single_menu(MENU_PLAYER *, int *);
 
 
@@ -800,7 +801,7 @@ int do_dialog(DIALOG *dialog, int focus_obj)
 
    player = init_dialog(dialog, focus_obj);
 
-   while (update_dialog(player)) {
+   while (update_dialog_held(player)) {
       /* If a menu is active, we yield here, since the dialog
        * engine is shut down so no user code can be running.
        */
@@ -1302,6 +1303,17 @@ int update_dialog(DIALOG_PLAYER *player)
 
    ret = (!(player->res & D_CLOSE));
    player->res &= ~D_CLOSE;
+   return ret;
+}
+
+
+
+static int update_dialog_held(DIALOG_PLAYER *player)
+{
+   int ret;
+   hold_screen_refresh(TRUE);
+   ret = update_dialog(player);
+   hold_screen_refresh(FALSE);
    return ret;
 }
 
