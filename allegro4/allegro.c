@@ -880,17 +880,17 @@ static void draw_into(BITMAP *bitmap){
 
 void circle(BITMAP * buffer, int x, int y, int radius, int color){
     draw_into(buffer);
-    al_draw_circle(x, y, radius, a5color(color, current_depth), 1);
+    al_draw_circle(x + 0.5, y + 0.5, radius, a5color(color, current_depth), 1);
 }
 
 void circlefill(BITMAP * buffer, int x, int y, int radius, int color){
     draw_into(buffer);
-    al_draw_filled_circle(x, y, radius, a5color(color, current_depth));
+    al_draw_filled_circle(x + 0.5, y + 0.5, radius, a5color(color, current_depth));
 }
 
 void rect(BITMAP * buffer, int x1, int y1, int x2, int y2, int color){
     draw_into(buffer);
-    al_draw_rectangle(x1, y1, x2+1, y2+1, a5color(color, current_depth), 1);
+    al_draw_rectangle(x1 + 0.5, y1 + 0.5, x2 + 0.5, y2 + 0.5, a5color(color, current_depth), 1);
 }
 
 void rectfill(BITMAP * buffer, int x1, int y1, int x2, int y2, int color){
@@ -937,15 +937,17 @@ void putpixel(BITMAP * buffer, int x, int y, int color){
 
 void line(BITMAP * buffer, int x, int y, int x2, int y2, int color){
     draw_into(buffer);
-    al_draw_line(x, y, x2, y2, a5color(color, current_depth), 1);
+    al_draw_line(x + 0.5, y + 0.5, x2 + 0.5, y2 + 0.5, a5color(color, current_depth), 1);
 }
 
 void hline(BITMAP * buffer, int x, int y, int x2, int color){
-    line(buffer, x, y, x2, y, color);
+    draw_into(buffer);
+    al_draw_line(x, y + 0.5, x2 + 1, y + 0.5, a5color(color, current_depth), 1);
 }
 
 void vline(BITMAP * buffer, int x, int y, int y2, int color){
-    line(buffer, x, y, x, y2, color);
+    draw_into(buffer);
+    al_draw_line(x + 0.5, y, x + 0.5, y2 + 1, a5color(color, current_depth), 1);
 }
 
 static void maybe_flip_screen(BITMAP * where){
