@@ -646,7 +646,7 @@ int delete_file(AL_CONST char *filename)
 }
 
 
-#if 0
+
 /* for_each_file:
  *  Finds all the files on the disk which match the given wildcard
  *  specification and file attributes, and executes callback() once for
@@ -751,7 +751,7 @@ int for_each_file_ex(AL_CONST char *name, int in_attrib, int out_attrib, int (*c
 
    return c;
 }
-#endif
+
 
 
 /* find_resource:
