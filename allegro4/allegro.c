@@ -705,8 +705,10 @@ static void * read_keys(ALLEGRO_THREAD * self, void * arg){
             if (keybuffer_pos < KEYBUFFER_LENGTH) {
                 keybuffer[keybuffer_pos].unicode = event.keyboard.unichar;
                 keybuffer[keybuffer_pos].keycode = event.keyboard.keycode;
-                /* FIXME: handle the rest of the modifiers */
-                keybuffer[keybuffer_pos].modifiers = (event.keyboard.modifiers & ALLEGRO_KEYMOD_SHIFT) ? KB_SHIFT_FLAG : 0;
+                /* This depends on the identical correspondence of modifier
+                 * flags between A4 and A5.
+                 */
+                keybuffer[keybuffer_pos].modifiers = event.keyboard.modifiers;
                 keybuffer_pos++;
                 al_broadcast_cond(keybuffer_cond);
             }
