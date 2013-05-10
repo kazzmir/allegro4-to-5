@@ -630,9 +630,50 @@ int scancode_to_ascii(int scancode){
     return '?';
 }
 
-static int is_shift(int key){
-    return key == ALLEGRO_KEY_LSHIFT ||
-           key == ALLEGRO_KEY_RSHIFT;
+static void update_keyshifts(int key, int down){
+    int flag;
+    switch (key) {
+        case ALLEGRO_KEY_LSHIFT:
+        case ALLEGRO_KEY_RSHIFT:
+            flag = KB_SHIFT_FLAG;
+            break;
+        case ALLEGRO_KEY_LCTRL:
+        case ALLEGRO_KEY_RCTRL:
+            flag = KB_CTRL_FLAG;
+            break;
+        case ALLEGRO_KEY_ALT:
+        case ALLEGRO_KEY_ALTGR:
+            flag = KB_ALT_FLAG;
+            break;
+        case ALLEGRO_KEY_LWIN:
+            flag = KB_LWIN_FLAG;
+            break;
+        case ALLEGRO_KEY_RWIN:
+            flag = KB_RWIN_FLAG;
+            break;
+        case ALLEGRO_KEY_MENU:
+            flag = KB_MENU_FLAG;
+            break;
+        case ALLEGRO_KEY_COMMAND:
+            flag = KB_COMMAND_FLAG;
+            break;
+        case ALLEGRO_KEY_SCROLLLOCK:
+            flag = KB_SCROLOCK_FLAG;
+            break;
+        case ALLEGRO_KEY_NUMLOCK:
+            flag = KB_NUMLOCK_FLAG;
+            break;
+        case ALLEGRO_KEY_CAPSLOCK:
+            flag = KB_CAPSLOCK_FLAG;
+            break;
+        default:
+            return;
+    }
+    if (down) {
+        key_shifts |= flag;
+    } else {
+        key_shifts &=~ flag;
+    }
 }
 
 static void * read_keys(ALLEGRO_THREAD * self, void * arg){
@@ -648,19 +689,14 @@ static void * read_keys(ALLEGRO_THREAD * self, void * arg){
         if (event.type == ALLEGRO_EVENT_KEY_DOWN){
             int k = a4key(event.keyboard.keycode);
             key[k] = 1;
-            if (is_shift(event.keyboard.keycode)){
-                key_shifts |= KB_SHIFT_FLAG;
-            }
-
+            update_keyshifts(event.keyboard.keycode, TRUE);
             if (keyboard_lowlevel_callback) {
                 keyboard_lowlevel_callback(k);
             }
         } else if (event.type == ALLEGRO_EVENT_KEY_UP){
             int k = a4key(event.keyboard.keycode);
             key[k] = 0;
-            if (is_shift(event.keyboard.keycode)){
-                key_shifts &= ~KB_SHIFT_FLAG;
-            }
+            update_keyshifts(event.keyboard.keycode, FALSE);
             if (keyboard_lowlevel_callback) {
                 keyboard_lowlevel_callback(k + 128);
             }
