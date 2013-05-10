@@ -35,7 +35,7 @@
 #include <string.h>
 
 #include "allegro.h"
-#include "allegro/internal/aintern.h"
+#include "include/internal/aintern.h"
 
 
 #if (DEVICE_SEPARATOR != 0) && (DEVICE_SEPARATOR != '\0')
@@ -874,8 +874,8 @@ int file_select_ex(AL_CONST char *message, char *path, AL_CONST char *ext, int s
    file_selector[FS_MESSAGE].dp = (char *)message;
    file_selector[FS_EDIT].d1 = size/uwidth_max(U_CURRENT) - 1;
    file_selector[FS_EDIT].dp = path;
-   file_selector[FS_OK].dp = (void*)get_config_text("OK");
-   file_selector[FS_CANCEL].dp = (void*)get_config_text("Cancel");
+   file_selector[FS_OK].dp = "OK";
+   file_selector[FS_CANCEL].dp = "Cancel";
 
    /* Set default attributes. */
    memcpy(attrb_state, default_attrb_state, sizeof(default_attrb_state));

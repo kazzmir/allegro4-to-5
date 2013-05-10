@@ -92,6 +92,9 @@ unsigned int _default_ds();
 #define bmp_read32(addr)            (*((uint32_t *)(addr)))
 #define bmp_write32(addr, c)        (*((uint32_t *)(addr)) = (c))
 
+#define OLD_FILESEL_WIDTH   -1
+#define OLD_FILESEL_HEIGHT  -1
+
 #define END_OF_MAIN()
 
 #ifdef __cplusplus
