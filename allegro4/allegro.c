@@ -53,6 +53,7 @@ GFX_DRIVER _gfx_driver = {0, "A5", "A5", "A5", 0, 0, 0, 0, 0, 0, 0, 0};
 GFX_DRIVER *gfx_driver = &_gfx_driver;
 void (*keyboard_lowlevel_callback)(int scancode);
 BITMAP * screen;
+static int screen_refresh_held = 0;
 static FONT _font;
 struct FONT * font = &_font;
 int * palette_color;
@@ -950,9 +951,24 @@ void vline(BITMAP * buffer, int x, int y, int y2, int color){
     al_draw_line(x + 0.5, y, x + 0.5, y2 + 1, a5color(color, current_depth), 1);
 }
 
+void hold_screen_refresh(int hold) {
+    if (hold) {
+	if (screen_refresh_held == 0)
+	    screen_refresh_held = 1;
+    } else {
+	if (screen_refresh_held > 1)
+	    al_flip_display();
+	screen_refresh_held = 0;
+    }
+}
+
 static void maybe_flip_screen(BITMAP * where){
     if (where == screen){
-        al_flip_display();
+	if (screen_refresh_held == 0) {
+	    al_flip_display();
+	} else {
+	    screen_refresh_held++;
+	}
     }
 }
 

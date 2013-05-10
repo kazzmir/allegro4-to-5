@@ -15,6 +15,8 @@ typedef enum
 
 void convert_8bit(BITMAP *bitmap, CONVERT_8BIT mode, ALLEGRO_COLOR c);
 
+void hold_screen_refresh(int hold);
+
 #ifdef __cplusplus
    }
 #endif
