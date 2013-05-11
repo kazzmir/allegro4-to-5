@@ -554,22 +554,29 @@ void set_color_conversion(int mode){
 }
 
 int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualheight){
+    int i;
     if (card == GFX_TEXT) {
         if (display)
             al_destroy_display(display);
         display = NULL;
         return 0;
     }
-    int i;
     display = al_create_display(width, height);
-    screen = create_bitmap_from(al_get_backbuffer(display));
-    palette_color = palette_color8;
-    set_palette(default_palette);
-    setup_default_driver(screen);
-    for (i = 0; i < 256; i++){
-        palette_color8[i] = i;
+    if (display) {
+        screen = create_bitmap_from(al_get_backbuffer(display));
+        if (screen) {
+            palette_color = palette_color8;
+            set_palette(default_palette);
+            setup_default_driver(screen);
+            for (i = 0; i < 256; i++){
+                palette_color8[i] = i;
+            }
+            _gfx_mode_set_count++;
+        } else {
+            al_destroy_display(display);
+            display = NULL;
+        }
     }
-    _gfx_mode_set_count++;
     return is_ok(display != NULL);
 }
 
