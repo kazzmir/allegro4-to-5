@@ -58,6 +58,7 @@ static FONT _font;
 struct FONT * font = &_font;
 int * palette_color;
 ALLEGRO_DISPLAY * display;
+static char window_title[128] = "";
 volatile int mouse_w;
 volatile int mouse_x;
 volatile int mouse_y;
@@ -563,6 +564,9 @@ int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualh
     }
     display = al_create_display(width, height);
     if (display) {
+        if (window_title[0]) {
+            al_set_window_title(display, window_title);
+        }
         screen = create_bitmap_from(al_get_backbuffer(display));
         if (screen) {
             palette_color = palette_color8;
@@ -1750,7 +1754,9 @@ int set_close_button_callback(void (*proc)(void)){
 }
 
 void set_window_title(AL_CONST char *name){
-    /* FIXME */
+    _al_sane_strncpy(window_title, name, sizeof(window_title));
+    if (display)
+        al_set_window_title(display, window_title);
 }
 
 int stricmp(AL_CONST char *s1, AL_CONST char *s2){
