@@ -856,6 +856,10 @@ void draw_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y){
     blit(sprite, bmp, 0, 0, x, y, sprite->w, sprite->h);
 }
 
+void stretch_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y, int w, int h){
+    stretch_blit(sprite, bmp, 0, 0, sprite->w, sprite->h, x, y, w, h);
+}
+
 void masked_blit(BITMAP * from, BITMAP * to, int from_x, int from_y, int to_x, int to_y, int width, int height){
     blit(from, to, from_x, from_y, to_x, to_y, width, height);
 }
