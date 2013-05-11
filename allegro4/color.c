@@ -18,6 +18,8 @@ int _rgb_g_shift_32 = DEFAULT_RGB_G_SHIFT_32;
 int _rgb_b_shift_32 = DEFAULT_RGB_B_SHIFT_32;
 int _rgb_a_shift_32 = DEFAULT_RGB_A_SHIFT_32;
 
+PALETTE black_palette;
+
 PALETTE desktop_palette = 
 {
    { 63, 63, 63, 0 },   { 63, 0,  0,  0 },   { 0,  63, 0,  0 },   { 63, 63, 0,  0 },
