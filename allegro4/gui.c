@@ -443,10 +443,16 @@ int broadcast_dialog_message(int msg, int c)
 {
    int nowhere;
 
-   if (active_dialog)
-      return dialog_message(active_dialog, msg, c, &nowhere);
-   else
-      return D_O_K;
+   if (active_dialog) {
+      int ret = dialog_message(active_dialog, msg, c, &nowhere);
+      if (msg == MSG_IDLE) {
+         hold_screen_refresh(FALSE);
+         hold_screen_refresh(TRUE);
+      }
+      return ret;
+   }
+
+   return D_O_K;
 }
 
 
