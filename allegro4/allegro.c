@@ -1592,8 +1592,9 @@ int enable_triple_buffer(){
 }
 
 int save_bitmap(AL_CONST char *filename, struct BITMAP *bmp, AL_CONST struct RGB *pal){
-    /* FIXME */
-    return -1;
+    bool ok = al_save_bitmap(filename, bmp->real);
+    (void)pal;
+    return is_ok(ok);
 }
 
 int is_video_bitmap(BITMAP * what){
