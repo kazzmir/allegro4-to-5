@@ -662,13 +662,26 @@ static void check_blending(){
     }
 }
 
+static void call_constructors(void) {
+   #ifndef ALLEGRO_USE_CONSTRUCTOR
+      /* call constructor functions manually */
+      extern void _initialize_datafile_types();
+
+      _initialize_datafile_types();
+   #endif
+}
+
 int install_allegro(int system_id, int *errno_ptr, int (*atexit_ptr)(void (*func)(void))){
     return _install_allegro_version_check(system_id, errno_ptr, atexit_ptr, 0);
 }
 
 int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_ptr)(void (*func)(void)), int version){
     int index;
-    int ok = al_init();
+    int ok;
+
+    call_constructors();
+
+    ok = al_init();
     current_config.allegro = al_create_config();
     al_init_primitives_addon();
     al_init_image_addon();
