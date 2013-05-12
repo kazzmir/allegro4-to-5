@@ -17,6 +17,8 @@ int AL_RAND(){
 
 #include "include/internal/aintern.h"
 
+#define VERSION_5_1_0 0x05010000
+
 #define KEYBUFFER_LENGTH 256
 
 typedef struct {int keycode, unicode, modifiers;} KEYBUFFER_ENTRY;
@@ -410,9 +412,20 @@ static BITMAP * create_bitmap_from(ALLEGRO_BITMAP * real){
     return bitmap;
 }
 
-BITMAP * load_bitmap(const char * path,struct RGB *pal){
-    return create_bitmap_from(al_load_bitmap_flags(path,
-        ALLEGRO_NO_PREMULTIPLIED_ALPHA));
+BITMAP * load_bitmap(const char * path, struct RGB *pal){
+    ALLEGRO_BITMAP *bmp;
+#if ALLEGRO_VERSION_INT >= VERSION_5_1_0
+    bmp = al_load_bitmap_flags(path, ALLEGRO_NO_PREMULTIPLIED_ALPHA);
+#else
+    int old_flags = al_get_new_bitmap_flags();
+    al_set_new_bitmap_flags(old_flags | ALLEGRO_NO_PREMULTIPLIED_ALPHA);
+    bmp = al_load_bitmap(path);
+    al_set_new_bitmap_flags(old_flags);
+#endif
+    if (bmp)
+	return create_bitmap_from(bmp);
+    else
+	return NULL;
 }
 
 struct BITMAP * load_bmp(AL_CONST char *filename, struct RGB *pal){
@@ -634,10 +647,13 @@ static void start_system_thread(){
 
 static void check_blending(){
     if (blender.draw_mode == DRAW_MODE_TRANS){
+#if ALLEGRO_VERSION_INT >= VERSION_5_1_0
         if (blender.blend_mode == MULTIPLY){
             al_set_blender(ALLEGRO_ADD, ALLEGRO_DST_COLOR, ALLEGRO_ZERO);
         }
-        else{
+        else
+#endif
+        {
             al_set_blender(ALLEGRO_ADD, ALLEGRO_ALPHA, ALLEGRO_INVERSE_ALPHA);
         }
     }
