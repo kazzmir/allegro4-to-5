@@ -64,6 +64,8 @@ MENU *active_menu = NULL;
 
 
 static BITMAP *gui_screen = NULL;
+static BITMAP *gui_dbuf = NULL;
+static int gui_dbuf_dirty = FALSE;
 
 
 /* list of currently active (initialized) dialog players */
@@ -78,6 +80,7 @@ static struct al_active_dialog_player *current_active_dialog_player = 0;
 
 /* forward declarations */
 static int update_dialog_held(DIALOG_PLAYER *player);
+static int update_menu_held(MENU_PLAYER *player);
 static int shutdown_single_menu(MENU_PLAYER *, int *);
 
 
@@ -348,6 +351,7 @@ int object_message(DIALOG *dialog, int msg, int c)
    if (msg == MSG_DRAW) {
       release_screen();
       unscare_mouse();
+      gui_dbuf_dirty = TRUE;
    }
 
    if (ret & D_REDRAWME) {
@@ -434,6 +438,25 @@ int dialog_message(DIALOG *dialog, int msg, int c, int *obj)
 
 
 
+static void maybe_update_screen(void)
+{
+   BITMAP *gui_bmp;
+
+   /* If we are using the gui_dbuf to emulate a retained screen
+    * then copy it to the actual screen now.
+    */
+   gui_bmp = gui_get_screen();
+   if (gui_bmp == gui_dbuf && gui_dbuf_dirty) {
+      blit(gui_bmp, screen, 0, 0, 0, 0, gui_bmp->w, gui_bmp->h);
+      gui_dbuf_dirty = FALSE;
+   }
+
+   hold_screen_refresh(FALSE);
+   hold_screen_refresh(TRUE);
+}
+
+
+
 /* broadcast_dialog_message:
  *  Broadcasts a message to all the objects in the active dialog. If any of
  *  the dialog procedures return values other than D_O_K, it returns that
@@ -446,8 +469,7 @@ int broadcast_dialog_message(int msg, int c)
    if (active_dialog) {
       int ret = dialog_message(active_dialog, msg, c, &nowhere);
       if (msg == MSG_IDLE) {
-         hold_screen_refresh(FALSE);
-         hold_screen_refresh(TRUE);
+         maybe_update_screen();
       }
       return ret;
    }
@@ -797,11 +819,24 @@ static int move_focus(DIALOG *d, int ascii, int scan, int *focus_obj)
 int do_dialog(DIALOG *dialog, int focus_obj)
 {
    BITMAP *mouse_screen = _mouse_screen;
-   BITMAP *gui_bmp = gui_get_screen();
+   BITMAP *dbuf = NULL;
+   BITMAP *gui_bmp;
    int screen_count = _gfx_mode_set_count;
    void *player;
    ASSERT(dialog);
 
+   /* In Allegro 5, some (most) back-ends will lose the screen contents after
+    * flipping, contrary to Allegro 4.  Emulate that with an implicit double
+    * buffer.  This only works for GUI procs which respect gui_set_screen().
+    */
+   if (!gui_dbuf && gui_get_screen() == screen) {
+      gui_dbuf = dbuf = create_bitmap(SCREEN_W, SCREEN_H);
+      blit(screen, dbuf, 0, 0, 0, 0, SCREEN_W, SCREEN_H);
+      gui_set_screen(dbuf);
+      gui_dbuf_dirty = FALSE;
+   }
+
+   gui_bmp = gui_get_screen();
    if (!is_same_bitmap(_mouse_screen, gui_bmp) && !(gfx_capabilities&GFX_HW_CURSOR))
       show_mouse(gui_bmp);
 
@@ -817,6 +852,14 @@ int do_dialog(DIALOG *dialog, int focus_obj)
 
    if (_gfx_mode_set_count == screen_count && !(gfx_capabilities&GFX_HW_CURSOR))
       show_mouse(mouse_screen);
+
+   if (dbuf) {
+      if (gui_dbuf == dbuf)
+         gui_dbuf = NULL;
+      if (gui_get_screen() == dbuf)
+         gui_set_screen(NULL);
+      destroy_bitmap(dbuf);
+   }
 
    return shutdown_dialog(player);
 }
@@ -853,6 +896,7 @@ int popup_dialog(DIALOG *dialog, int focus_obj)
       blit(bmp, gui_bmp, 0, 0, dialog->x, dialog->y, dialog->w, dialog->h);
       unscare_mouse();
       destroy_bitmap(bmp);
+      gui_dbuf_dirty = TRUE;
    }
 
    return ret;
@@ -1040,7 +1084,7 @@ int update_dialog(DIALOG_PLAYER *player)
    /* redirect to update_menu() whenever a menu is activated */
    if (active_menu_player) {
       if (!active_menu_player_zombie) {
-	 if (update_menu(active_menu_player))
+	 if (update_menu_held(active_menu_player))
 	    return TRUE;
       }
 
@@ -1319,6 +1363,7 @@ static int update_dialog_held(DIALOG_PLAYER *player)
    int ret;
    hold_screen_refresh(TRUE);
    ret = update_dialog(player);
+   maybe_update_screen();
    hold_screen_refresh(FALSE);
    return ret;
 }
@@ -1754,7 +1799,7 @@ int do_menu(MENU *menu, int x, int y)
 
    player = init_menu(menu, x ,y);
 
-   while (update_menu(player))
+   while (update_menu_held(player))
       rest(1);
 
    ret = shutdown_menu(player);
@@ -2017,6 +2062,8 @@ int update_menu(MENU_PLAYER *player)
 	    draw_menu_item(player, player->sel);
       }
 
+      gui_dbuf_dirty = TRUE;
+
       release_bitmap(gui_bmp);
       if (scare)
 	 unscare_mouse();
@@ -2107,6 +2154,18 @@ int update_menu(MENU_PLAYER *player)
       return FALSE;
 
    return TRUE;
+}
+
+
+
+static int update_menu_held(MENU_PLAYER *player)
+{
+   int ret;
+   hold_screen_refresh(TRUE);
+   ret = update_menu(player);
+   maybe_update_screen();
+   hold_screen_refresh(FALSE);
+   return ret;
 }
 
 
