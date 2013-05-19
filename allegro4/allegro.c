@@ -19,6 +19,11 @@ int AL_RAND(){
 
 #define VERSION_5_1_0 0x05010000
 
+typedef struct TIMER {
+    ALLEGRO_TIMER *timer;
+    void (*callback)();
+} TIMER;
+
 #define KEYBUFFER_LENGTH 256
 
 typedef struct {int keycode, unicode, modifiers;} KEYBUFFER_ENTRY;
@@ -34,6 +39,8 @@ char allegro_error[ALLEGRO_ERROR_SIZE];
 
 static ALLEGRO_THREAD *system_thread;
 static ALLEGRO_EVENT_QUEUE *system_event_queue;
+static TIMER timers[MAX_TIMERS];
+struct ALLEGRO_MUTEX *timer_mutex;
 static ALLEGRO_MUTEX *keybuffer_mutex;
 static ALLEGRO_COND *keybuffer_cond;
 static ALLEGRO_EVENT_SOURCE keybuffer_event_source;
@@ -778,6 +785,19 @@ static void handle_mouse_event(ALLEGRO_MOUSE_EVENT *event) {
     }
 }
 
+static void handle_timer_event(ALLEGRO_TIMER_EVENT *event) {
+    int i;
+
+    al_lock_mutex(timer_mutex);
+    for (i = 0; i < MAX_TIMERS; i++) {
+        if (timers[i].timer == event->source) {
+            timers[i].callback();
+            break;
+        }
+    }
+    al_unlock_mutex(timer_mutex);
+}
+
 static void *system_thread_func(ALLEGRO_THREAD * self, void * arg){
 
     ALLEGRO_TIMER *retrace_timer = al_create_timer(1.0 / 60);
@@ -790,6 +810,8 @@ static void *system_thread_func(ALLEGRO_THREAD * self, void * arg){
         if (event.type == ALLEGRO_EVENT_TIMER){
             if (event.timer.source == retrace_timer) {
                 retrace_count++;
+            } else {
+                handle_timer_event(&event.timer);
             }
         }
         else if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE){
@@ -818,10 +840,11 @@ static bool start_system_thread(){
     /* XXX never cleaned up */
     system_thread = al_create_thread(system_thread_func, NULL);
     system_event_queue = al_create_event_queue();
+    timer_mutex = al_create_mutex();
     keybuffer_mutex = al_create_mutex();
     keybuffer_cond = al_create_cond();
     al_init_user_event_source(&keybuffer_event_source);
-    if (system_thread && system_event_queue && keybuffer_mutex && keybuffer_cond) {
+    if (system_thread && system_event_queue && timer_mutex && keybuffer_mutex && keybuffer_cond) {
         al_start_thread(system_thread);
         return true;
     }
@@ -1431,47 +1454,60 @@ void polygon3d_f(BITMAP * bitmap, int type, BITMAP * texture, int vc, V3D_f * vt
     free(a5_vertexes);
 }
 
-struct timer_stuff{
-    long speed;
-    void (*callback)();
-};
+int install_int_ex(void (*proc)(void), long speed){
+    double fspeed = (double) speed / (double) TIMERS_PER_SECOND;
+    int ret = -1;
+    int i;
 
-static void * start_timer(ALLEGRO_THREAD * self, void * arg){
-    struct timer_stuff * stuff = (struct timer_stuff*) arg;
-    ALLEGRO_TIMER * timer;
-    double speed = (double) stuff->speed / (double) TIMERS_PER_SECOND;
-    ALLEGRO_EVENT_QUEUE * queue = al_create_event_queue();
+    al_lock_mutex(timer_mutex);
 
-    timer = al_create_timer(speed);
-    al_start_timer(timer);
-    al_register_event_source(queue, al_get_timer_event_source(timer));
-
-    while (true){
-        ALLEGRO_EVENT event;
-        al_wait_for_event(queue, &event);
-        if (event.type == ALLEGRO_EVENT_TIMER){
-            stuff->callback();
+    /* Change speed if proc already exists. */
+    for (i = 0; i < MAX_TIMERS; i++) {
+        if (proc == timers[i].callback) {
+            al_set_timer_speed(timers[i].timer, fspeed);
+            ret = 0;
+            break;
         }
     }
 
-    free(stuff);
-    return NULL;
-}
-
-int install_int_ex(void (*proc)(void), long speed){
-    struct timer_stuff * timer = malloc(sizeof(struct timer_stuff));
-    timer->speed = speed;
-    timer->callback = proc;
-    ALLEGRO_THREAD * thread = al_create_thread(start_timer, timer);
-    if (thread != NULL){
-        al_start_thread(thread);
-        return 0;
+    /* Add new timer if proc wasn't found. */
+    if (i == MAX_TIMERS) {
+        for (i = 0; i < MAX_TIMERS; i++) {
+            if (timers[i].timer == NULL) {
+                timers[i].timer = al_create_timer(fspeed);
+                if (timers[i].timer != NULL) {
+                    timers[i].callback = proc;
+                    al_register_event_source(system_event_queue,
+                        al_get_timer_event_source(timers[i].timer));
+                    al_start_timer(timers[i].timer);
+                    ret = 0;
+                }
+                break;
+            }
+        }
     }
-    return -1;
+
+    al_unlock_mutex(timer_mutex);
+
+    return ret;
 }
 
 int install_int(void (*proc)(void), long speed){
     return install_int_ex(proc, MSEC_TO_TIMER(speed));
+}
+
+void remove_int(void (*proc)(void)){
+    int i;
+
+    al_lock_mutex(timer_mutex);
+    for (i = 0; i < MAX_TIMERS; i++) {
+        if (timers[i].callback == proc) {
+            al_stop_timer(timers[i].timer);
+            timers[i].timer = NULL;
+            timers[i].callback = NULL;
+        }
+    }
+    al_unlock_mutex(timer_mutex);
 }
 
 void push_config_state(){
@@ -1726,10 +1762,6 @@ void voice_stop(int voice){
 int poll_joystick(void){
     /* FIXME */
     return 0;
-}
-
-void remove_int(void (*proc)(void)){
-    /* FIXME */
 }
 
 void release_bitmap(BITMAP * bitmap){
