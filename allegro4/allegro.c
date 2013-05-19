@@ -612,7 +612,10 @@ int install_timer(){
 }
 
 int install_mouse(){
-    return 2;
+    if (al_install_mouse()) {
+        return al_get_mouse_num_buttons();
+    }
+    return -1;
 }
 
 int install_keyboard(){
@@ -869,7 +872,6 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     al_init_primitives_addon();
     al_init_image_addon();
     al_init_font_addon();
-    al_install_mouse();
     start_system_thread();
 
     for (index = 16; index < 256; index++){
