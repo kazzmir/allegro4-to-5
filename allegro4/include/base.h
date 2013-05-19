@@ -8,6 +8,8 @@
 #include <time.h>
 #include <stdarg.h>
 
+#include "internal/alconfig.h"
+
 #define AL_FUNC(type, name, args)               type name args
 #ifdef AL_CONST
 #undef AL_CONST

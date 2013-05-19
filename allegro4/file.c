@@ -173,12 +173,184 @@ char *fix_filename_slashes(char *filename)
  */
 char *canonicalize_filename(char *dest, AL_CONST char *filename, int size)
 {
-   char const *r;
-   ALLEGRO_PATH *path = al_create_path(filename);
-   al_make_path_canonical(path);
-   r = al_path_cstr(path, ALLEGRO_NATIVE_PATH_SEP);
-   _al_sane_strncpy(dest, r, size);
-   al_destroy_path(path);
+   int saved_errno = errno;
+   char buf[1024], buf2[1024];
+   char *p;
+   int pos = 0;
+   int drive = -1;
+   int c1, i;
+   ASSERT(dest);
+   ASSERT(filename);
+   ASSERT(size >= 0);
+
+   #if (DEVICE_SEPARATOR != 0) && (DEVICE_SEPARATOR != '\0')
+
+      /* check whether we have a drive letter */
+      c1 = utolower(ugetc(filename));
+      if ((c1 >= 'a') && (c1 <= 'z')) {
+	 int c2 = ugetat(filename, 1);
+	 if (c2 == DEVICE_SEPARATOR) {
+	    drive = c1 - 'a';
+	    filename += uwidth(filename);
+	    filename += uwidth(filename);
+	 }
+      }
+
+      /* if not, use the current drive */
+      if (drive < 0)
+	 drive = _al_getdrive();
+
+      pos += usetc(buf+pos, drive+'a');
+      pos += usetc(buf+pos, DEVICE_SEPARATOR);
+
+   #endif
+
+   #ifdef ALLEGRO_UNIX
+
+      /* if the filename starts with ~ then it's relative to a home directory */
+      if ((ugetc(filename) == '~')) {
+	 AL_CONST char *tail = filename + uwidth(filename); /* could be the username */
+	 char *home = NULL;                /* their home directory */
+
+	 if (ugetc(tail) == '/' || !ugetc(tail)) {
+	    /* easy */
+	    home = getenv("HOME");
+	    if (home)
+	       home = _al_strdup(home);
+	 }
+	 else {
+	    /* harder */
+	    char *username = (char *)tail, *ascii_username, *ch;
+	    int userlen;
+	    struct passwd *pwd;
+
+	    /* find the end of the username */
+	    tail = ustrchr(username, '/');
+	    if (!tail)
+	       tail = ustrchr(username, '\0');
+
+	    /* this ought to be the ASCII length, but I can't see a Unicode
+	     * function to return the difference in characters between two
+	     * pointers. This code is safe on the assumption that ASCII is
+	     * the most efficient encoding, but wasteful of memory */
+	    userlen = tail - username + ucwidth('\0');
+	    ascii_username = _AL_MALLOC_ATOMIC(userlen);
+
+	    if (ascii_username) {
+	       /* convert the username to ASCII, find the password entry,
+		* and copy their home directory. */
+	       do_uconvert(username, U_CURRENT, ascii_username, U_ASCII, userlen);
+
+	       if ((ch = strchr(ascii_username, '/')))
+		  *ch = '\0';
+
+	       setpwent();
+
+	       while (((pwd = getpwent()) != NULL) && 
+		      (strcmp(pwd->pw_name, ascii_username) != 0))
+		  ;
+
+	       _AL_FREE(ascii_username);
+
+	       if (pwd)
+		  home = _al_strdup(pwd->pw_dir);
+
+	       endpwent();
+	    }
+	 }
+
+	 /* If we got a home directory, prepend it to the filename. Otherwise
+	  * we leave the filename alone, like bash but not tcsh; bash is better
+	  * anyway. :)
+	  */
+	 if (home) {
+	    do_uconvert(home, U_ASCII, buf+pos, U_CURRENT, sizeof(buf)-pos);
+	    _AL_FREE(home);
+	    pos = ustrsize(buf);
+	    filename = tail;
+	    goto no_relativisation;
+	 }
+      }
+
+   #endif   /* Unix */
+
+   /* if the filename is relative, make it absolute */
+   if ((ugetc(filename) != '/') && (ugetc(filename) != OTHER_PATH_SEPARATOR) && (ugetc(filename) != '#')) {
+      _al_getdcwd(drive, buf2, sizeof(buf2) - ucwidth(OTHER_PATH_SEPARATOR));
+      put_backslash(buf2);
+
+      p = buf2;
+      if ((utolower(p[0]) >= 'a') && (utolower(p[0]) <= 'z') && (p[1] == DEVICE_SEPARATOR))
+	 p += 2;
+
+      ustrzcpy(buf+pos, sizeof(buf)-pos, p);
+      pos = ustrsize(buf);
+   }
+
+ #ifdef ALLEGRO_UNIX
+   no_relativisation:
+ #endif
+
+   /* add our filename, and clean it up a bit */
+   ustrzcpy(buf+pos, sizeof(buf)-pos, filename);
+
+   fix_filename_case(buf);
+   fix_filename_slashes(buf);
+
+   /* remove duplicate slashes */
+   pos = usetc(buf2, OTHER_PATH_SEPARATOR);
+   pos += usetc(buf2+pos, OTHER_PATH_SEPARATOR);
+   usetc(buf2+pos, 0);
+
+   while ((p = ustrstr(buf, buf2)) != NULL)
+      uremove(p, 0);
+
+   /* remove /./ patterns */
+   pos = usetc(buf2, OTHER_PATH_SEPARATOR);
+   pos += usetc(buf2+pos, '.');
+   pos += usetc(buf2+pos, OTHER_PATH_SEPARATOR);
+   usetc(buf2+pos, 0);
+
+   while ((p = ustrstr(buf, buf2)) != NULL) {
+      uremove(p, 0);
+      uremove(p, 0);
+   }
+
+   /* collapse /../ patterns */
+   pos = usetc(buf2, OTHER_PATH_SEPARATOR);
+   pos += usetc(buf2+pos, '.');
+   pos += usetc(buf2+pos, '.');
+   pos += usetc(buf2+pos, OTHER_PATH_SEPARATOR);
+   usetc(buf2+pos, 0);
+
+   while ((p = ustrstr(buf, buf2)) != NULL) {
+      for (i=0; buf+uoffset(buf, i) < p; i++)
+	 ;
+
+      while (--i > 0) {
+	 c1 = ugetat(buf, i);
+
+	 if (c1 == OTHER_PATH_SEPARATOR)
+	    break;
+
+	 if (c1 == DEVICE_SEPARATOR) {
+	    i++;
+	    break;
+	 }
+      }
+
+      if (i < 0)
+	 i = 0;
+
+      p += ustrsize(buf2);
+      memmove(buf+uoffset(buf, i+1), p, ustrsizez(p));
+   }
+
+   /* all done! */
+   ustrzcpy(dest, size, buf);
+
+   errno = saved_errno;
+
    return dest;
 }
 
@@ -532,6 +704,7 @@ int get_filename_encoding(void)
  */
 int file_exists(AL_CONST char *filename, int attrib, int *aret)
 {
+   struct al_ffblk info;
    ASSERT(filename);
 
    if (ustrchr(filename, '#')) {
@@ -547,17 +720,18 @@ int file_exists(AL_CONST char *filename, int attrib, int *aret)
    if (!_al_file_isok(filename))
       return FALSE;
 
-   ALLEGRO_FS_ENTRY *e = al_create_fs_entry(filename);
-   
-   if (!al_fs_entry_exists(e)) {
-       al_destroy_fs_entry(e);
-       return FALSE;
+   if (al_findfirst(filename, &info, attrib) != 0) {
+      /* no entry is not an error for file_exists() */
+      if (*allegro_errno == ENOENT)
+         *allegro_errno = 0;
+
+      return FALSE;
    }
 
+   al_findclose(&info);
+
    if (aret)
-      *aret = al_get_fs_entry_mode(e);
-      
-   al_destroy_fs_entry(e);
+      *aret = info.attrib;
 
    return TRUE;
 }
@@ -646,7 +820,7 @@ int delete_file(AL_CONST char *filename)
 }
 
 
-#if 0
+
 /* for_each_file:
  *  Finds all the files on the disk which match the given wildcard
  *  specification and file attributes, and executes callback() once for
@@ -751,7 +925,7 @@ int for_each_file_ex(AL_CONST char *name, int in_attrib, int out_attrib, int (*c
 
    return c;
 }
-#endif
+
 
 
 /* find_resource:

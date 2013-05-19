@@ -17,6 +17,13 @@ int AL_RAND(){
 
 #include "include/internal/aintern.h"
 
+#define VERSION_5_1_0 0x05010000
+
+typedef struct TIMER {
+    ALLEGRO_TIMER *timer;
+    void (*callback)();
+} TIMER;
+
 #define KEYBUFFER_LENGTH 256
 
 typedef struct {int keycode, unicode, modifiers;} KEYBUFFER_ENTRY;
@@ -30,10 +37,20 @@ int * allegro_errno = &_allegro_errno;
 char allegro_id[] = "Allegro 4 to 5 Layer Version 0.1";
 char allegro_error[ALLEGRO_ERROR_SIZE];
 
+static ALLEGRO_THREAD *system_thread;
+static ALLEGRO_EVENT_QUEUE *system_event_queue;
+static TIMER timers[MAX_TIMERS];
+struct ALLEGRO_MUTEX *timer_mutex;
+static ALLEGRO_MUTEX *keybuffer_mutex;
+static ALLEGRO_COND *keybuffer_cond;
+static ALLEGRO_EVENT_SOURCE keybuffer_event_source;
+const unsigned USER_EVENT_CLEAR_KEYBUF = ALLEGRO_GET_EVENT_TYPE('4','C','K','B');
+
 volatile char key[KEY_MAX];
-static volatile KEYBUFFER_ENTRY keybuffer[KEYBUFFER_LENGTH];
-static volatile int keybuffer_pos;
+static KEYBUFFER_ENTRY keybuffer[KEYBUFFER_LENGTH];
+static int keybuffer_pos;
 volatile int key_shifts;
+
 SYSTEM_DRIVER _system_driver = {0, "A5", "A5", "A5"};
 SYSTEM_DRIVER *system_driver = &_system_driver;
 KEYBOARD_DRIVER _keyboard_driver = {0, "A5", "A5", "A5", 0};
@@ -42,14 +59,16 @@ MOUSE_DRIVER _mouse_driver = {0, "A5", "A5", "A5"};
 MOUSE_DRIVER *mouse_driver = &_mouse_driver;
 TIMER_DRIVER _timer_driver = {0, "A5", "A5", "A5"};
 TIMER_DRIVER *timer_driver = &_timer_driver;
-GFX_DRIVER _gfx_driver = {0, "A5", "A5", "A5"};
+GFX_DRIVER _gfx_driver = {0, "A5", "A5", "A5", 0, 0, 0, 0, 0, 0, 0, 0};
 GFX_DRIVER *gfx_driver = &_gfx_driver;
 void (*keyboard_lowlevel_callback)(int scancode);
 BITMAP * screen;
+static int screen_refresh_held = 0;
 static FONT _font;
 struct FONT * font = &_font;
 int * palette_color;
 ALLEGRO_DISPLAY * display;
+static char window_title[128] = "";
 volatile int mouse_w;
 volatile int mouse_x;
 volatile int mouse_y;
@@ -110,6 +129,11 @@ int _rgb_scale_6[64] =
    195, 199, 203, 207, 211, 215, 219, 223,
    227, 231, 235, 239, 243, 247, 251, 255
 };
+
+
+/* forward declarations */
+static void lazily_create_real_bitmap(BITMAP *bitmap, int is_mono_font);
+
 
 /* allegro4 uses 0 as ok values */
 static int is_ok(int code){
@@ -193,33 +217,58 @@ void get_mouse_mickeys(int *x, int *y){
     mickey_y = mouse_y;
 }
 
-void set_mouse_sprite(BITMAP *sprite){
+static void set_mouse_sprite_real(ALLEGRO_BITMAP *sprite){
     if (cursor) al_destroy_mouse_cursor(cursor);
-    cursor_bitmap = sprite->real;
-    cursor = al_create_mouse_cursor(cursor_bitmap, cursor_x, cursor_y);
-    al_set_mouse_cursor(display, cursor);
+    if (sprite) {
+        cursor_bitmap = sprite;
+        cursor = al_create_mouse_cursor(cursor_bitmap, cursor_x, cursor_y);
+        al_set_mouse_cursor(display, cursor);
+        al_show_mouse_cursor(display);
+    } else {
+        cursor_bitmap = NULL;
+        cursor = NULL;
+        al_set_system_mouse_cursor(display, ALLEGRO_SYSTEM_MOUSE_CURSOR_DEFAULT);
+        al_hide_mouse_cursor(display);
+    }
+}
+
+void set_mouse_sprite(BITMAP *sprite){
+    if (sprite) {
+        lazily_create_real_bitmap(sprite, FALSE);
+        set_mouse_sprite_real(sprite->real);
+    } else {
+        set_mouse_sprite_real(NULL);
+    }
 }
 
 void set_mouse_sprite_focus(int x, int y){
-    if (cursor) al_destroy_mouse_cursor(cursor);
     cursor_x = x;
     cursor_y = y;
-    cursor = al_create_mouse_cursor(cursor_bitmap, cursor_x, cursor_y);
-    al_set_mouse_cursor(display, cursor);
+    set_mouse_sprite_real(cursor_bitmap);
 }
 
 int keypressed(){
-    return keybuffer_pos > 0;
+    int ret;
+    al_lock_mutex(keybuffer_mutex);
+    ret = (keybuffer_pos > 0);
+    al_unlock_mutex(keybuffer_mutex);
+    return ret;
 }
 
 int ureadkey(int *scancode){
-    while (keybuffer_pos == 0)
-        al_rest(0.1);
+    int ret;
+
+    al_lock_mutex(keybuffer_mutex);
+    while (keybuffer_pos == 0) {
+        al_wait_cond(keybuffer_cond, keybuffer_mutex);
+    }
     keybuffer_pos--;
     if (scancode) *scancode = keybuffer[keybuffer_pos].keycode;
     /* FIXME: not sure if the key_shifts should be updated here */
     key_shifts = keybuffer[keybuffer_pos].modifiers;
-    return keybuffer[keybuffer_pos].unicode;
+    ret = keybuffer[keybuffer_pos].unicode;
+    al_unlock_mutex(keybuffer_mutex);
+    return ret;
 }
 
 int readkey(){
@@ -229,16 +278,30 @@ int readkey(){
 }
 
 void clear_keybuf(){
-    keybuffer_pos = 0;
+    al_lock_mutex(keybuffer_mutex);
+    {
+        ALLEGRO_EVENT ev;
+        ev.type = USER_EVENT_CLEAR_KEYBUF;
+        al_emit_user_event(&keybuffer_event_source, &ev, NULL);
+        /* Always wait for a response, even if keybuffer_pos is initially zero.
+         * There may be unprocessed KEY_CHAR events already in the queue.
+         */
+        do {
+            al_wait_cond(keybuffer_cond, keybuffer_mutex);
+        } while (keybuffer_pos != 0);
+    }
+    al_unlock_mutex(keybuffer_mutex);
 }
 
 void simulate_keypress(int k){
+    al_lock_mutex(keybuffer_mutex);
     if (keybuffer_pos < KEYBUFFER_LENGTH) {
         keybuffer[keybuffer_pos].unicode = k & 255;
         keybuffer[keybuffer_pos].keycode = k >> 8;
         keybuffer[keybuffer_pos].modifiers = 0;
         keybuffer_pos++;
     }
+    al_unlock_mutex(keybuffer_mutex);
 }
 
 void rest(unsigned int milliseconds){
@@ -270,23 +333,55 @@ void create_rgb_table(RGB_MAP *table, AL_CONST PALETTE pal, AL_METHOD(void, call
 void create_light_table(COLOR_MAP *table, AL_CONST PALETTE pal, int r, int g, int b, AL_METHOD(void, callback, (int pos))){
 }
 
-static void convert_8bit(BITMAP * bitmap, int is_mono_font){
+static void convert_8bit_inner(BITMAP * bitmap, CONVERT_8BIT mode, ALLEGRO_COLOR replace){
     if (bitmap->depth == 8){
         int x, y;
         ALLEGRO_LOCKED_REGION *lock = al_lock_bitmap(bitmap->real,
                                                      ALLEGRO_PIXEL_FORMAT_ABGR_8888_LE, ALLEGRO_LOCK_WRITEONLY);
-        char *rgba = lock->data;
+        unsigned char *rgba = lock->data;
+        unsigned char repl[4];
+        al_unmap_rgba(replace, &repl[0], &repl[1], &repl[2], &repl[3]);
         for (y = 0; y < bitmap->h; y++){
             for (x = 0; x < bitmap->w; x++){
                 int c = *(bitmap->line[y] + x);
-                unsigned char red = current_palette[c].r * 4;
-                unsigned char green = current_palette[c].g * 4;
-                unsigned char blue = current_palette[c].b * 4;
-                char alpha = 255;
-                if (c == 0) {
-                    red = green = blue = alpha = 0;
-                } else if (is_mono_font && c){
-                    red = green = blue = 255;
+                unsigned char red, green, blue, alpha;
+                switch (mode) {
+                    case CONVERT_8BIT_PALETTE:
+                        red = _rgb_scale_6[current_palette[c].r];
+                        green = _rgb_scale_6[current_palette[c].g];
+                        blue = _rgb_scale_6[current_palette[c].b];
+                        alpha = 255;
+                        break;
+                    case CONVERT_8BIT_PALETTE_REPLACE_INDEX0:
+                        if (c == 0) {
+                            red = repl[0];
+                            green = repl[1];
+                            blue = repl[2];
+                            alpha = repl[3];
+                        } else {
+                            red = _rgb_scale_6[current_palette[c].r];
+                            green = _rgb_scale_6[current_palette[c].g];
+                            blue = _rgb_scale_6[current_palette[c].b];
+                            alpha = 255;
+                        }
+                        break;
+                    case CONVERT_8BIT_INTENSITY:
+                        red = green = blue = c;
+                        alpha = 255;
+                        break;
+                    case CONVERT_8BIT_MONO_FONT:
+                        if (c == 0) {
+                            red = repl[0];
+                            green = repl[1];
+                            blue = repl[2];
+                            alpha = repl[3];
+                        } else {
+                            red = green = blue = alpha = 255;
+                        }
+                        break;
+		    default:
+			red = green = blue = alpha = 0;
+			break;
                 }
                 rgba[y * lock->pitch + x * 4 + 0] = red;
                 rgba[y * lock->pitch + x * 4 + 1] = green;
@@ -298,10 +393,20 @@ static void convert_8bit(BITMAP * bitmap, int is_mono_font){
     }
 }
 
+void convert_8bit(BITMAP *bitmap, CONVERT_8BIT mode, ALLEGRO_COLOR c){
+    al_destroy_bitmap(bitmap->real);
+    bitmap->real = al_create_bitmap(bitmap->w, bitmap->h);
+    convert_8bit_inner(bitmap, mode, c);
+}
+
 static void lazily_create_real_bitmap(BITMAP *bitmap, int is_mono_font){
     if (bitmap->real == NULL){
-        bitmap->real = al_create_bitmap(bitmap->w, bitmap->h);
-        convert_8bit(bitmap, is_mono_font);
+        CONVERT_8BIT mode;
+        if (is_mono_font)
+            mode = CONVERT_8BIT_MONO_FONT;
+        else
+            mode = CONVERT_8BIT_PALETTE_REPLACE_INDEX0;
+        convert_8bit(bitmap, mode, al_map_rgba(0, 0, 0, 0));
     }
 }
 
@@ -346,7 +451,7 @@ static void lazily_create_real_font(FONT *font){
     for (j = 0; j < ranges_count; j++){
         int count = 1 + ranges[j * 2 + 1] - ranges[j * 2];
         for (i = 0; i < count; i++) {
-            lazily_create_real_bitmap(color_iterator->bitmaps[i], 1);
+            lazily_create_real_bitmap(color_iterator->bitmaps[i], is_mono_font(font));
             al_draw_bitmap(color_iterator->bitmaps[i]->real, x, 1, 0);
             x += color_iterator->bitmaps[i]->w + 1;
         }
@@ -410,9 +515,20 @@ static BITMAP * create_bitmap_from(ALLEGRO_BITMAP * real){
     return bitmap;
 }
 
-BITMAP * load_bitmap(const char * path,struct RGB *pal){
-    return create_bitmap_from(al_load_bitmap_flags(path,
-        ALLEGRO_NO_PREMULTIPLIED_ALPHA));
+BITMAP * load_bitmap(const char * path, struct RGB *pal){
+    ALLEGRO_BITMAP *bmp;
+#if ALLEGRO_VERSION_INT >= VERSION_5_1_0
+    bmp = al_load_bitmap_flags(path, ALLEGRO_NO_PREMULTIPLIED_ALPHA);
+#else
+    int old_flags = al_get_new_bitmap_flags();
+    al_set_new_bitmap_flags(old_flags | ALLEGRO_NO_PREMULTIPLIED_ALPHA);
+    bmp = al_load_bitmap(path);
+    al_set_new_bitmap_flags(old_flags);
+#endif
+    if (bmp)
+	return create_bitmap_from(bmp);
+    else
+	return NULL;
 }
 
 struct BITMAP * load_bmp(AL_CONST char *filename, struct RGB *pal){
@@ -449,23 +565,37 @@ void set_color_conversion(int mode){
 }
 
 int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualheight){
+    int i;
     if (card == GFX_TEXT) {
         if (display)
             al_destroy_display(display);
         display = NULL;
         return 0;
     }
-    int i;
     display = al_create_display(width, height);
-    screen = create_bitmap_from(al_get_backbuffer(display));
-    palette_color = palette_color8;
-    set_palette(default_palette);
-    setup_default_driver(screen);
-    for (i = 0; i < 256; i++){
-        palette_color8[i] = i;
+    if (display) {
+        if (window_title[0]) {
+            al_set_window_title(display, window_title);
+        }
+        screen = create_bitmap_from(al_get_backbuffer(display));
+        if (screen) {
+            palette_color = palette_color8;
+            set_palette(default_palette);
+            setup_default_driver(screen);
+            for (i = 0; i < 256; i++){
+                palette_color8[i] = i;
+            }
+            _gfx_mode_set_count++;
+        } else {
+            al_destroy_display(display);
+            display = NULL;
+        }
     }
-    _gfx_mode_set_count++;
-    return is_ok(display != NULL);
+    if (display) {
+        al_register_event_source(system_event_queue, al_get_display_event_source(display));
+        return 0;
+    }
+    return -1;
 }
 
 /*
@@ -494,27 +624,75 @@ int install_timer(){
     return 0;
 }
 
+void remove_timer() {
+    int i;
+
+    al_lock_mutex(timer_mutex);
+    for (i = 0; i < MAX_TIMERS; i++) {
+        if (timers[i].callback) {
+            al_stop_timer(timers[i].timer);
+            timers[i].timer = NULL;
+            timers[i].callback = NULL;
+        }
+    }
+    al_unlock_mutex(timer_mutex);
+}
+
 int install_mouse(){
-    return 2;
+    if (al_install_mouse()) {
+        al_register_event_source(system_event_queue,
+            al_get_mouse_event_source());
+        return al_get_mouse_num_buttons();
+    }
+    return -1;
 }
 
 int install_keyboard(){
-    return 0;
+    if (al_install_keyboard()) {
+        al_register_event_source(system_event_queue, al_get_keyboard_event_source());
+        al_register_event_source(system_event_queue, &keybuffer_event_source);
+        return 0;
+    }
+    return -1;
 }
 
 static int a4key(int a5key){
+    if (a5key < ALLEGRO_KEY_MODIFIERS)
+        return a5key;
     switch (a5key){
+        case ALLEGRO_KEY_LSHIFT: return KEY_LSHIFT;
+        case ALLEGRO_KEY_RSHIFT: return KEY_RSHIFT;
         case ALLEGRO_KEY_LCTRL: return KEY_LCONTROL;
         case ALLEGRO_KEY_RCTRL: return KEY_RCONTROL;
-        default: return a5key;
+        case ALLEGRO_KEY_ALT: return KEY_ALT;
+        case ALLEGRO_KEY_ALTGR: return KEY_ALTGR;
+        case ALLEGRO_KEY_LWIN: return KEY_LWIN;
+        case ALLEGRO_KEY_RWIN: return KEY_RWIN;
+        case ALLEGRO_KEY_MENU: return KEY_MENU;
+        case ALLEGRO_KEY_SCROLLLOCK: return KEY_SCRLOCK;
+        case ALLEGRO_KEY_NUMLOCK: return KEY_NUMLOCK;
+        case ALLEGRO_KEY_CAPSLOCK: return KEY_CAPSLOCK;
+        default: return 0;
     }
 }
 
 static int a5key(int a4key){
+    if (a4key < KEY_MODIFIERS)
+        return a4key;
     switch (a4key){
+        case KEY_LSHIFT: return ALLEGRO_KEY_LSHIFT;
+        case KEY_RSHIFT: return ALLEGRO_KEY_RSHIFT;
         case KEY_LCONTROL: return ALLEGRO_KEY_LCTRL;
         case KEY_RCONTROL: return ALLEGRO_KEY_RCTRL;
-        default: return a4key;
+        case KEY_ALT: return ALLEGRO_KEY_ALT;
+        case KEY_ALTGR: return ALLEGRO_KEY_ALTGR;
+        case KEY_LWIN: return ALLEGRO_KEY_LWIN;
+        case KEY_RWIN: return ALLEGRO_KEY_RWIN;
+        case KEY_MENU: return ALLEGRO_KEY_MENU;
+        case KEY_SCRLOCK: return ALLEGRO_KEY_SCROLLLOCK;
+        case KEY_NUMLOCK: return ALLEGRO_KEY_NUMLOCK;
+        case KEY_CAPSLOCK: return ALLEGRO_KEY_CAPSLOCK;
+        default: return 0;
     }
 }
 
@@ -526,118 +704,175 @@ int scancode_to_ascii(int scancode){
     return '?';
 }
 
-static int is_shift(int key){
-    return key == ALLEGRO_KEY_LSHIFT ||
-           key == ALLEGRO_KEY_RSHIFT;
+static void update_keyshifts(int key, int down){
+    int flag;
+    switch (key) {
+        case ALLEGRO_KEY_LSHIFT:
+        case ALLEGRO_KEY_RSHIFT:
+            flag = KB_SHIFT_FLAG;
+            break;
+        case ALLEGRO_KEY_LCTRL:
+        case ALLEGRO_KEY_RCTRL:
+            flag = KB_CTRL_FLAG;
+            break;
+        case ALLEGRO_KEY_ALT:
+        case ALLEGRO_KEY_ALTGR:
+            flag = KB_ALT_FLAG;
+            break;
+        case ALLEGRO_KEY_LWIN:
+            flag = KB_LWIN_FLAG;
+            break;
+        case ALLEGRO_KEY_RWIN:
+            flag = KB_RWIN_FLAG;
+            break;
+        case ALLEGRO_KEY_MENU:
+            flag = KB_MENU_FLAG;
+            break;
+        case ALLEGRO_KEY_COMMAND:
+            flag = KB_COMMAND_FLAG;
+            break;
+        case ALLEGRO_KEY_SCROLLLOCK:
+            flag = KB_SCROLOCK_FLAG;
+            break;
+        case ALLEGRO_KEY_NUMLOCK:
+            flag = KB_NUMLOCK_FLAG;
+            break;
+        case ALLEGRO_KEY_CAPSLOCK:
+            flag = KB_CAPSLOCK_FLAG;
+            break;
+        default:
+            return;
+    }
+    if (down) {
+        key_shifts |= flag;
+    } else {
+        key_shifts &=~ flag;
+    }
 }
 
-static void * read_keys(ALLEGRO_THREAD * self, void * arg){
+static void handle_keyboard_event(ALLEGRO_EVENT *event) {
+    if (event->type == ALLEGRO_EVENT_KEY_DOWN){
+        int k = a4key(event->keyboard.keycode);
+        key[k] = 1;
+        update_keyshifts(event->keyboard.keycode, TRUE);
+        if (keyboard_lowlevel_callback) {
+            keyboard_lowlevel_callback(k);
+        }
+    } else if (event->type == ALLEGRO_EVENT_KEY_UP){
+        int k = a4key(event->keyboard.keycode);
+        key[k] = 0;
+        update_keyshifts(event->keyboard.keycode, FALSE);
+        if (keyboard_lowlevel_callback) {
+            keyboard_lowlevel_callback(k + 128);
+        }
+    } else if (event->type == ALLEGRO_EVENT_KEY_CHAR){
+        al_lock_mutex(keybuffer_mutex);
+        if (keybuffer_pos < KEYBUFFER_LENGTH) {
+            keybuffer[keybuffer_pos].unicode = event->keyboard.unichar;
+            keybuffer[keybuffer_pos].keycode = event->keyboard.keycode;
+            /* This depends on the identical correspondence of modifier
+             * flags between A4 and A5.
+             */
+            keybuffer[keybuffer_pos].modifiers = event->keyboard.modifiers;
+            keybuffer_pos++;
+            al_broadcast_cond(keybuffer_cond);
+        }
+        al_unlock_mutex(keybuffer_mutex);
+    } else if (event->type == USER_EVENT_CLEAR_KEYBUF) {
+        al_lock_mutex(keybuffer_mutex);
+        keybuffer_pos = 0;
+        al_broadcast_cond(keybuffer_cond);
+        al_unlock_mutex(keybuffer_mutex);
+    }
+}
 
-    ALLEGRO_EVENT_QUEUE * queue = al_create_event_queue();
-    al_register_event_source(queue, al_get_keyboard_event_source());
-    al_register_event_source(queue, al_get_mouse_event_source());
+static void handle_mouse_event(ALLEGRO_MOUSE_EVENT *event) {
+    if (event->type == ALLEGRO_EVENT_MOUSE_AXES){
+        mouse_w = event->w;
+        mouse_x = event->x;
+        mouse_y = event->y;
+        mouse_z = event->z;
+    } else if (event->type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN){
+        mouse_b |= 1 << (event->button - 1);
+    } else if (event->type == ALLEGRO_EVENT_MOUSE_BUTTON_UP){
+        mouse_b &= ~(1 << (event->button - 1));
+    }
+}
 
-    while (true){
-        ALLEGRO_EVENT event;
-        al_wait_for_event(queue, &event);
-        if (event.type == ALLEGRO_EVENT_KEY_DOWN){
-            int k = a4key(event.keyboard.keycode);
-            key[k] = 1;
-            if (is_shift(event.keyboard.keycode)){
-                key_shifts |= KB_SHIFT_FLAG;
-            }
+static void handle_timer_event(ALLEGRO_TIMER_EVENT *event) {
+    int i;
 
-            if (keyboard_lowlevel_callback) {
-                al_set_target_backbuffer(display);
-                keyboard_lowlevel_callback(k);
-            }
-        } else if (event.type == ALLEGRO_EVENT_KEY_UP){
-            int k = a4key(event.keyboard.keycode);
-            key[k] = 0;
-            if (is_shift(event.keyboard.keycode)){
-                key_shifts &= ~KB_SHIFT_FLAG;
-            }
-            if (keyboard_lowlevel_callback) {
-                al_set_target_backbuffer(display);
-                keyboard_lowlevel_callback(k + 128);
-            }
-        } else if (event.type == ALLEGRO_EVENT_KEY_CHAR){
-            if (keybuffer_pos < KEYBUFFER_LENGTH) {
-                keybuffer[keybuffer_pos].unicode = event.keyboard.unichar;
-                keybuffer[keybuffer_pos].keycode = event.keyboard.keycode;
-                /* FIXME: handle the rest of the modifiers */
-                keybuffer[keybuffer_pos].modifiers = (event.keyboard.modifiers & ALLEGRO_KEYMOD_SHIFT) ? KB_SHIFT_FLAG : 0;
-                keybuffer_pos++;
-            }
-        } else if (event.type == ALLEGRO_EVENT_MOUSE_AXES){
-            mouse_w = event.mouse.w;
-            mouse_x = event.mouse.x;
-            mouse_y = event.mouse.y;
-            mouse_z = event.mouse.z;
-        } else if (event.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN){
-            mouse_b |= 1 << (event.mouse.button - 1);
-        } else if (event.type == ALLEGRO_EVENT_MOUSE_BUTTON_UP){
-            mouse_b &= ~(1 << (event.mouse.button - 1));
+    al_lock_mutex(timer_mutex);
+    for (i = 0; i < MAX_TIMERS; i++) {
+        if (timers[i].timer == event->source) {
+            timers[i].callback();
+            break;
         }
     }
-
-    return NULL;
+    al_unlock_mutex(timer_mutex);
 }
 
-static void *system_thread(ALLEGRO_THREAD * self, void * arg){
+static void *system_thread_func(ALLEGRO_THREAD * self, void * arg){
 
-    ALLEGRO_EVENT_QUEUE * queue = al_create_event_queue();
-   bool have_display = false;
-
-    ALLEGRO_TIMER *timer = al_create_timer(1.0 / 60);
-    al_start_timer(timer);
-    al_register_event_source(queue, al_get_timer_event_source(timer));
+    ALLEGRO_TIMER *retrace_timer = al_create_timer(1.0 / 60);
+    al_register_event_source(system_event_queue, al_get_timer_event_source(retrace_timer));
+    al_start_timer(retrace_timer);
     
-    while (true){
+    while (!al_get_thread_should_stop(self)){
         ALLEGRO_EVENT event;
-        al_wait_for_event(queue, &event);
+        al_wait_for_event(system_event_queue, &event);
         if (event.type == ALLEGRO_EVENT_TIMER){
-            retrace_count++;
+            if (event.timer.source == retrace_timer) {
+                retrace_count++;
+            } else {
+                handle_timer_event(&event.timer);
+            }
         }
-       if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE){
-          if (close_button_callback)
-             close_button_callback();
-       }
-       if (!have_display) {
-          if (display) {
-             have_display = true;
-             al_register_event_source(queue, al_get_display_event_source(display));
-          }
-       }
+        else if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE){
+            if (close_button_callback)
+                close_button_callback();
+        }
+        else if (event.type == ALLEGRO_EVENT_KEY_DOWN ||
+            event.type == ALLEGRO_EVENT_KEY_UP ||
+            event.type == ALLEGRO_EVENT_KEY_CHAR ||
+            event.type == USER_EVENT_CLEAR_KEYBUF)
+        {
+            handle_keyboard_event(&event);
+        }
+        else if (event.type == ALLEGRO_EVENT_MOUSE_AXES ||
+            event.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN ||
+            event.type == ALLEGRO_EVENT_MOUSE_BUTTON_UP)
+        {
+            handle_mouse_event(&event.mouse);
+        }
     }
 
     return NULL;
 }
 
-static void start_key_thread(){
-    ALLEGRO_THREAD * thread = al_create_thread(read_keys, NULL);
-    if (thread != NULL){
-        al_start_thread(thread);
-    } else {
-        printf("Could not start key thread!\n");
+static bool start_system_thread(){
+    system_thread = al_create_thread(system_thread_func, NULL);
+    system_event_queue = al_create_event_queue();
+    timer_mutex = al_create_mutex();
+    keybuffer_mutex = al_create_mutex();
+    keybuffer_cond = al_create_cond();
+    al_init_user_event_source(&keybuffer_event_source);
+    if (system_thread && system_event_queue && timer_mutex && keybuffer_mutex && keybuffer_cond) {
+        al_start_thread(system_thread);
+        return true;
     }
-}
-
-static void start_system_thread(){
-    ALLEGRO_THREAD * thread = al_create_thread(system_thread, NULL);
-    if (thread != NULL){
-        al_start_thread(thread);
-    } else {
-        printf("Could not start system thread!\n");
-    }
+    return false;
 }
 
 static void check_blending(){
     if (blender.draw_mode == DRAW_MODE_TRANS){
+#if ALLEGRO_VERSION_INT >= VERSION_5_1_0
         if (blender.blend_mode == MULTIPLY){
             al_set_blender(ALLEGRO_ADD, ALLEGRO_DST_COLOR, ALLEGRO_ZERO);
         }
-        else{
+        else
+#endif
+        {
             al_set_blender(ALLEGRO_ADD, ALLEGRO_ALPHA, ALLEGRO_INVERSE_ALPHA);
         }
     }
@@ -646,24 +881,34 @@ static void check_blending(){
     }
 }
 
+static void call_constructors(void) {
+   #ifndef ALLEGRO_USE_CONSTRUCTOR
+      /* call constructor functions manually */
+      extern void _initialize_datafile_types();
+
+      _initialize_datafile_types();
+   #endif
+}
+
 int install_allegro(int system_id, int *errno_ptr, int (*atexit_ptr)(void (*func)(void))){
     return _install_allegro_version_check(system_id, errno_ptr, atexit_ptr, 0);
 }
 
 int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_ptr)(void (*func)(void)), int version){
     int index;
-    int ok = al_init();
+
+    call_constructors();
+
+    if (!al_init())
+        return -1;
     current_config.allegro = al_create_config();
     al_init_primitives_addon();
     al_init_image_addon();
     al_init_font_addon();
-    al_install_audio();
-    al_reserve_samples(10);
-    al_install_keyboard();
-    al_install_mouse();
-    // al_set_new_bitmap_flags(ALLEGRO_MEMORY_BITMAP);
-    start_key_thread();
-    start_system_thread();
+    if (!start_system_thread()) {
+        allegro_exit();
+        return -1;
+    }
 
     for (index = 16; index < 256; index++){
         desktop_palette[index] = desktop_palette[index & 15];
@@ -673,7 +918,36 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     
     _allegro_count++;
 
-    return is_ok(ok);
+    return 0;
+}
+
+void allegro_exit(void) {
+    if (system_thread) {
+        /* This requires system_thread_proc to be woken up regularly,
+         * such as by the retrace_count timer.
+         */
+        al_join_thread(system_thread, NULL);
+        system_thread = NULL;
+    }
+    if (system_event_queue) {
+        al_destroy_event_queue(system_event_queue);
+        system_event_queue = NULL;
+    }
+    if (timer_mutex) {
+        remove_timer();
+        al_destroy_mutex(timer_mutex);
+        timer_mutex = NULL;
+    }
+    if (keybuffer_mutex) {
+        al_destroy_mutex(keybuffer_mutex);
+        keybuffer_mutex = NULL;
+    }
+    if (keybuffer_cond) {
+        al_destroy_cond(keybuffer_cond);
+        keybuffer_cond = NULL;
+    }
+    al_destroy_user_event_source(&keybuffer_event_source);
+    al_uninstall_system();
 }
 
 static void draw_into(BITMAP *bitmap){
@@ -685,17 +959,17 @@ static void draw_into(BITMAP *bitmap){
 
 void circle(BITMAP * buffer, int x, int y, int radius, int color){
     draw_into(buffer);
-    al_draw_circle(x, y, radius, a5color(color, current_depth), 1);
+    al_draw_circle(x + 0.5, y + 0.5, radius, a5color(color, current_depth), 1);
 }
 
 void circlefill(BITMAP * buffer, int x, int y, int radius, int color){
     draw_into(buffer);
-    al_draw_filled_circle(x, y, radius, a5color(color, current_depth));
+    al_draw_filled_circle(x + 0.5, y + 0.5, radius, a5color(color, current_depth));
 }
 
 void rect(BITMAP * buffer, int x1, int y1, int x2, int y2, int color){
     draw_into(buffer);
-    al_draw_rectangle(x1, y1, x2+1, y2+1, a5color(color, current_depth), 1);
+    al_draw_rectangle(x1 + 0.5, y1 + 0.5, x2 + 0.5, y2 + 0.5, a5color(color, current_depth), 1);
 }
 
 void rectfill(BITMAP * buffer, int x1, int y1, int x2, int y2, int color){
@@ -742,36 +1016,53 @@ void putpixel(BITMAP * buffer, int x, int y, int color){
 
 void line(BITMAP * buffer, int x, int y, int x2, int y2, int color){
     draw_into(buffer);
-    al_draw_line(x, y, x2, y2, a5color(color, current_depth), 1);
+    al_draw_line(x + 0.5, y + 0.5, x2 + 0.5, y2 + 0.5, a5color(color, current_depth), 1);
 }
 
 void hline(BITMAP * buffer, int x, int y, int x2, int color){
-    line(buffer, x, y, x2, y, color);
+    draw_into(buffer);
+    al_draw_line(x, y + 0.5, x2 + 1, y + 0.5, a5color(color, current_depth), 1);
 }
 
 void vline(BITMAP * buffer, int x, int y, int y2, int color){
-    line(buffer, x, y, x, y2, color);
+    draw_into(buffer);
+    al_draw_line(x + 0.5, y, x + 0.5, y2 + 1, a5color(color, current_depth), 1);
+}
+
+void hold_screen_refresh(int hold) {
+    if (hold) {
+	if (screen_refresh_held == 0)
+	    screen_refresh_held = 1;
+    } else {
+	if (screen_refresh_held > 1)
+	    al_flip_display();
+	screen_refresh_held = 0;
+    }
 }
 
 static void maybe_flip_screen(BITMAP * where){
     if (where == screen){
-        al_flip_display();
+	if (screen_refresh_held == 0) {
+	    al_flip_display();
+	} else {
+	    screen_refresh_held++;
+	}
     }
 }
 
 void stretch_blit(BITMAP *source, BITMAP *dest, int source_x,
     int source_y, int source_width, int source_height, int dest_x,
     int dest_y, int dest_width, int dest_height){
-        
+
     lazily_create_real_bitmap(source, 0);
     lazily_create_real_bitmap(dest, 0);
-        
+
     ALLEGRO_BITMAP * al_from = source->real;
     ALLEGRO_BITMAP * al_to = dest->real;
-    
+
     if (al_is_bitmap_locked(al_from))
         al_unlock_bitmap(al_from);
-    
+
     /* A4 allows drawing a bitmap to itself, A5 does not. */
     if (al_from == al_to) {
         ALLEGRO_BITMAP *temp = al_create_bitmap(source_width, source_height);
@@ -785,18 +1076,17 @@ void stretch_blit(BITMAP *source, BITMAP *dest, int source_x,
         al_set_target_bitmap(al_to);
         if (blender.draw_mode == DRAW_MODE_TRANS){
             ALLEGRO_COLOR tint = al_map_rgba(blender.color.r,
-            blender.color.g, blender.color.b, blender.color.a);
+                blender.color.g, blender.color.b, blender.color.a);
             al_draw_tinted_scaled_bitmap(al_from, tint, source_x, source_y,
                 source_width,
                 source_height, dest_x, dest_y, dest_width, dest_height, 0);
-     }
-     else{
+        } else {
             al_draw_scaled_bitmap(al_from, source_x, source_y,
                 source_width,
                 source_height, dest_x, dest_y, dest_width, dest_height, 0);
         }
     }
- 
+
     maybe_flip_screen(dest);
 }
 
@@ -806,6 +1096,10 @@ void blit(BITMAP * from, BITMAP * to, int from_x, int from_y, int to_x, int to_y
 
 void draw_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y){
     blit(sprite, bmp, 0, 0, x, y, sprite->w, sprite->h);
+}
+
+void stretch_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y, int w, int h){
+    stretch_blit(sprite, bmp, 0, 0, sprite->w, sprite->h, x, y, w, h);
 }
 
 void masked_blit(BITMAP * from, BITMAP * to, int from_x, int from_y, int to_x, int to_y, int width, int height){
@@ -839,16 +1133,20 @@ void draw_sprite_vh_flip(BITMAP *bmp, BITMAP *sprite, int x, int y){
     al_draw_bitmap(sprite->real, x, y, ALLEGRO_FLIP_HORIZONTAL | ALLEGRO_FLIP_VERTICAL);
 }
 
+static float radians(fixed angle){
+    return fixtof(angle) * ALLEGRO_PI / 128.0;
+}
+
 void pivot_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y, int cx, int cy, fixed angle){
     draw_into(bmp);
     lazily_create_real_bitmap(sprite, 0);
-    al_draw_rotated_bitmap(sprite->real, cx, cy, x, y, angle * ALLEGRO_PI / 65536.0 / 256.0, 0);
+    al_draw_rotated_bitmap(sprite->real, cx, cy, x, y, radians(angle), 0);
 }
 
 void pivot_sprite_v_flip(BITMAP *bmp, BITMAP *sprite, int x, int y, int cx, int cy, fixed angle){
     draw_into(bmp);
     lazily_create_real_bitmap(sprite, 0);
-    al_draw_rotated_bitmap(sprite->real, cx, cy, x, y, angle * ALLEGRO_PI / 65536.0 / 256.0, ALLEGRO_FLIP_VERTICAL);
+    al_draw_rotated_bitmap(sprite->real, cx, cy, x, y, radians(angle), ALLEGRO_FLIP_VERTICAL);
 }
 
 void draw_lit_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y, int a){
@@ -869,6 +1167,14 @@ void draw_lit_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y, in
     al_destroy_bitmap(temp);
 }
 
+static ALLEGRO_COLOR text_color(int color, int current_depth){
+    if (color == -1) {
+        return al_map_rgb(255, 255, 255);
+    } else {
+        return a5color(color, current_depth);
+    }
+}
+
 void textprintf_ex(struct BITMAP *bmp, struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
     char buffer[65536];
     va_list args;
@@ -886,7 +1192,8 @@ void textout_centre_ex(struct BITMAP *bmp, struct FONT *f, AL_CONST char *str, i
         al_draw_filled_rectangle(x - w / 2, y, x + w - w / 2,
             y + al_get_font_line_height(f->real), a5color(bg, current_depth));
     }
-    al_draw_text(f->real, a5color(color, current_depth), x, y, ALLEGRO_ALIGN_CENTRE, str);
+    al_draw_text(f->real, text_color(color, current_depth), x, y, ALLEGRO_ALIGN_CENTRE, str);
+    maybe_flip_screen(bmp);
 }
 
 void textout_right_ex(struct BITMAP *bmp, struct FONT *f, AL_CONST char *str, int x, int y, int color, int bg){
@@ -897,7 +1204,8 @@ void textout_right_ex(struct BITMAP *bmp, struct FONT *f, AL_CONST char *str, in
         al_draw_filled_rectangle(x - w / 2, y, x + w - w / 2,
             y + al_get_font_line_height(f->real), a5color(bg, current_depth));
     }
-    al_draw_text(f->real, a5color(color, current_depth), x, y, ALLEGRO_ALIGN_RIGHT, str);
+    al_draw_text(f->real, text_color(color, current_depth), x, y, ALLEGRO_ALIGN_RIGHT, str);
+    maybe_flip_screen(bmp);
 }
 
 void textprintf_right_ex(struct BITMAP *bmp, struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
@@ -925,7 +1233,7 @@ void textout_ex(struct BITMAP *bmp, struct FONT *f, AL_CONST char *str, int x, i
         al_draw_filled_rectangle(x, y, x + al_get_text_width(f->real, str),
             y + al_get_font_line_height(f->real), a5color(bg, current_depth));
     }
-    al_draw_text(f->real, a5color(color, current_depth), x, y, 0, str);
+    al_draw_text(f->real, text_color(color, current_depth), x, y, 0, str);
 
     maybe_flip_screen(bmp);
 }
@@ -1188,47 +1496,60 @@ void polygon3d_f(BITMAP * bitmap, int type, BITMAP * texture, int vc, V3D_f * vt
     free(a5_vertexes);
 }
 
-struct timer_stuff{
-    long speed;
-    void (*callback)();
-};
+int install_int_ex(void (*proc)(void), long speed){
+    double fspeed = (double) speed / (double) TIMERS_PER_SECOND;
+    int ret = -1;
+    int i;
 
-static void * start_timer(ALLEGRO_THREAD * self, void * arg){
-    struct timer_stuff * stuff = (struct timer_stuff*) arg;
-    ALLEGRO_TIMER * timer;
-    double speed = (double) stuff->speed / (double) TIMERS_PER_SECOND;
-    ALLEGRO_EVENT_QUEUE * queue = al_create_event_queue();
+    al_lock_mutex(timer_mutex);
 
-    timer = al_create_timer(speed);
-    al_start_timer(timer);
-    al_register_event_source(queue, al_get_timer_event_source(timer));
-
-    while (true){
-        ALLEGRO_EVENT event;
-        al_wait_for_event(queue, &event);
-        if (event.type == ALLEGRO_EVENT_TIMER){
-            stuff->callback();
+    /* Change speed if proc already exists. */
+    for (i = 0; i < MAX_TIMERS; i++) {
+        if (proc == timers[i].callback) {
+            al_set_timer_speed(timers[i].timer, fspeed);
+            ret = 0;
+            break;
         }
     }
 
-    free(stuff);
-    return NULL;
-}
-
-int install_int_ex(void (*proc)(void), long speed){
-    struct timer_stuff * timer = malloc(sizeof(struct timer_stuff));
-    timer->speed = speed;
-    timer->callback = proc;
-    ALLEGRO_THREAD * thread = al_create_thread(start_timer, timer);
-    if (thread != NULL){
-        al_start_thread(thread);
-        return 0;
+    /* Add new timer if proc wasn't found. */
+    if (i == MAX_TIMERS) {
+        for (i = 0; i < MAX_TIMERS; i++) {
+            if (timers[i].timer == NULL) {
+                timers[i].timer = al_create_timer(fspeed);
+                if (timers[i].timer != NULL) {
+                    timers[i].callback = proc;
+                    al_register_event_source(system_event_queue,
+                        al_get_timer_event_source(timers[i].timer));
+                    al_start_timer(timers[i].timer);
+                    ret = 0;
+                }
+                break;
+            }
+        }
     }
-    return -1;
+
+    al_unlock_mutex(timer_mutex);
+
+    return ret;
 }
 
 int install_int(void (*proc)(void), long speed){
     return install_int_ex(proc, MSEC_TO_TIMER(speed));
+}
+
+void remove_int(void (*proc)(void)){
+    int i;
+
+    al_lock_mutex(timer_mutex);
+    for (i = 0; i < MAX_TIMERS; i++) {
+        if (timers[i].callback == proc) {
+            al_stop_timer(timers[i].timer);
+            timers[i].timer = NULL;
+            timers[i].callback = NULL;
+        }
+    }
+    al_unlock_mutex(timer_mutex);
 }
 
 void push_config_state(){
@@ -1353,13 +1674,22 @@ int enable_triple_buffer(){
 }
 
 int save_bitmap(AL_CONST char *filename, struct BITMAP *bmp, AL_CONST struct RGB *pal){
-    /* FIXME */
-    return -1;
+    bool ok = al_save_bitmap(filename, bmp->real);
+    (void)pal;
+    return is_ok(ok);
 }
 
 int is_video_bitmap(BITMAP * what){
     /* All bitmaps are video */
     return 1;
+}
+
+void rotate_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y, fixed angle){
+    pivot_sprite(bmp, sprite, x + sprite->w/2, y + sprite->h/2, sprite->w/2, sprite->h/2, angle);
+}
+
+void rotate_sprite_v_flip(BITMAP *bmp, BITMAP *sprite, int x, int y, fixed angle) {
+    pivot_sprite_v_flip(bmp, sprite, x + sprite->w/2, y + sprite->h/2, sprite->w/2, sprite->h/2, angle);
 }
 
 void rotate_scaled_sprite(BITMAP *bmp, BITMAP *sprite, int x, int y, fixed angle, fixed scale){
@@ -1476,10 +1806,6 @@ int poll_joystick(void){
     return 0;
 }
 
-void remove_int(void (*proc)(void)){
-    /* FIXME */
-}
-
 void release_bitmap(BITMAP * bitmap){
 }
 
@@ -1507,12 +1833,9 @@ int set_close_button_callback(void (*proc)(void)){
 }
 
 void set_window_title(AL_CONST char *name){
-    /* FIXME */
-}
-
-int stricmp(AL_CONST char *s1, AL_CONST char *s2){
-    /* FIXME */
-    return -1;
+    _al_sane_strncpy(window_title, name, sizeof(window_title));
+    if (display)
+        al_set_window_title(display, window_title);
 }
 
 void destroy_rle_sprite(RLE_SPRITE *rle){
