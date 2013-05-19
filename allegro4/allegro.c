@@ -123,6 +123,7 @@ int _rgb_scale_6[64] =
 
 /* forward declarations */
 static void lazily_create_real_bitmap(BITMAP *bitmap, int is_mono_font);
+static void start_key_thread(void);
 
 
 /* allegro4 uses 0 as ok values */
@@ -615,7 +616,11 @@ int install_mouse(){
 }
 
 int install_keyboard(){
-    return 0;
+    if (al_install_keyboard()) {
+        start_key_thread();
+        return 0;
+    }
+    return -1;
 }
 
 static int a4key(int a5key){
@@ -864,9 +869,7 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     al_init_primitives_addon();
     al_init_image_addon();
     al_init_font_addon();
-    al_install_keyboard();
     al_install_mouse();
-    start_key_thread();
     start_system_thread();
 
     for (index = 16; index < 256; index++){
