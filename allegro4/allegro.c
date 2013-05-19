@@ -624,6 +624,20 @@ int install_timer(){
     return 0;
 }
 
+void remove_timer() {
+    int i;
+
+    al_lock_mutex(timer_mutex);
+    for (i = 0; i < MAX_TIMERS; i++) {
+        if (timers[i].callback) {
+            al_stop_timer(timers[i].timer);
+            timers[i].timer = NULL;
+            timers[i].callback = NULL;
+        }
+    }
+    al_unlock_mutex(timer_mutex);
+}
+
 int install_mouse(){
     if (al_install_mouse()) {
         al_register_event_source(system_event_queue,
@@ -804,7 +818,7 @@ static void *system_thread_func(ALLEGRO_THREAD * self, void * arg){
     al_register_event_source(system_event_queue, al_get_timer_event_source(retrace_timer));
     al_start_timer(retrace_timer);
     
-    while (true){
+    while (!al_get_thread_should_stop(self)){
         ALLEGRO_EVENT event;
         al_wait_for_event(system_event_queue, &event);
         if (event.type == ALLEGRO_EVENT_TIMER){
@@ -837,7 +851,6 @@ static void *system_thread_func(ALLEGRO_THREAD * self, void * arg){
 }
 
 static bool start_system_thread(){
-    /* XXX never cleaned up */
     system_thread = al_create_thread(system_thread_func, NULL);
     system_event_queue = al_create_event_queue();
     timer_mutex = al_create_mutex();
@@ -893,7 +906,7 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     al_init_image_addon();
     al_init_font_addon();
     if (!start_system_thread()) {
-        al_uninstall_system();
+        allegro_exit();
         return -1;
     }
 
@@ -906,6 +919,35 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     _allegro_count++;
 
     return 0;
+}
+
+void allegro_exit(void) {
+    if (system_thread) {
+        /* This requires system_thread_proc to be woken up regularly,
+         * such as by the retrace_count timer.
+         */
+        al_join_thread(system_thread, NULL);
+        system_thread = NULL;
+    }
+    if (system_event_queue) {
+        al_destroy_event_queue(system_event_queue);
+        system_event_queue = NULL;
+    }
+    if (timer_mutex) {
+        remove_timer();
+        al_destroy_mutex(timer_mutex);
+        timer_mutex = NULL;
+    }
+    if (keybuffer_mutex) {
+        al_destroy_mutex(keybuffer_mutex);
+        keybuffer_mutex = NULL;
+    }
+    if (keybuffer_cond) {
+        al_destroy_cond(keybuffer_cond);
+        keybuffer_cond = NULL;
+    }
+    al_destroy_user_event_source(&keybuffer_event_source);
+    al_uninstall_system();
 }
 
 static void draw_into(BITMAP *bitmap){
