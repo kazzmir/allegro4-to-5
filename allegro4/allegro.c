@@ -822,13 +822,13 @@ static void start_key_thread(){
     }
 }
 
-static void start_system_thread(){
+static bool start_system_thread(){
     ALLEGRO_THREAD * thread = al_create_thread(system_thread, NULL);
     if (thread != NULL){
         al_start_thread(thread);
-    } else {
-        printf("Could not start system thread!\n");
+        return true;
     }
+    return false;
 }
 
 static void check_blending(){
@@ -872,7 +872,10 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     al_init_primitives_addon();
     al_init_image_addon();
     al_init_font_addon();
-    start_system_thread();
+    if (!start_system_thread()) {
+        al_uninstall_system();
+        return -1;
+    }
 
     for (index = 16; index < 256; index++){
         desktop_palette[index] = desktop_palette[index & 15];
