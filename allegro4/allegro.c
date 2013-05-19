@@ -855,18 +855,17 @@ int install_allegro(int system_id, int *errno_ptr, int (*atexit_ptr)(void (*func
 
 int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_ptr)(void (*func)(void)), int version){
     int index;
-    int ok;
 
     call_constructors();
 
-    ok = al_init();
+    if (!al_init())
+        return -1;
     current_config.allegro = al_create_config();
     al_init_primitives_addon();
     al_init_image_addon();
     al_init_font_addon();
     al_install_keyboard();
     al_install_mouse();
-    // al_set_new_bitmap_flags(ALLEGRO_MEMORY_BITMAP);
     start_key_thread();
     start_system_thread();
 
@@ -878,7 +877,7 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     
     _allegro_count++;
 
-    return is_ok(ok);
+    return 0;
 }
 
 static void draw_into(BITMAP *bitmap){
