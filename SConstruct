@@ -10,7 +10,7 @@ def defaultEnvironment():
     return env
 
 def allegro_libname(name):
-    allegro_version = "5.1"
+    allegro_version = "5"
     if static:
         version = "static-" + allegro_version
     else:
