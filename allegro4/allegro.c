@@ -1838,11 +1838,6 @@ void set_window_title(AL_CONST char *name){
         al_set_window_title(display, window_title);
 }
 
-int stricmp(AL_CONST char *s1, AL_CONST char *s2){
-    /* FIXME */
-    return -1;
-}
-
 void destroy_rle_sprite(RLE_SPRITE *rle){
     destroy_bitmap(rle);
 }
