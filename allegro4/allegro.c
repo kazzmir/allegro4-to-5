@@ -607,18 +607,42 @@ int install_keyboard(){
 }
 
 static int a4key(int a5key){
+    if (a5key < ALLEGRO_KEY_MODIFIERS)
+        return a5key;
     switch (a5key){
+        case ALLEGRO_KEY_LSHIFT: return KEY_LSHIFT;
+        case ALLEGRO_KEY_RSHIFT: return KEY_RSHIFT;
         case ALLEGRO_KEY_LCTRL: return KEY_LCONTROL;
         case ALLEGRO_KEY_RCTRL: return KEY_RCONTROL;
-        default: return a5key;
+        case ALLEGRO_KEY_ALT: return KEY_ALT;
+        case ALLEGRO_KEY_ALTGR: return KEY_ALTGR;
+        case ALLEGRO_KEY_LWIN: return KEY_LWIN;
+        case ALLEGRO_KEY_RWIN: return KEY_RWIN;
+        case ALLEGRO_KEY_MENU: return KEY_MENU;
+        case ALLEGRO_KEY_SCROLLLOCK: return KEY_SCRLOCK;
+        case ALLEGRO_KEY_NUMLOCK: return KEY_NUMLOCK;
+        case ALLEGRO_KEY_CAPSLOCK: return KEY_CAPSLOCK;
+        default: return 0;
     }
 }
 
 static int a5key(int a4key){
+    if (a4key < KEY_MODIFIERS)
+        return a4key;
     switch (a4key){
+        case KEY_LSHIFT: return ALLEGRO_KEY_LSHIFT;
+        case KEY_RSHIFT: return ALLEGRO_KEY_RSHIFT;
         case KEY_LCONTROL: return ALLEGRO_KEY_LCTRL;
         case KEY_RCONTROL: return ALLEGRO_KEY_RCTRL;
-        default: return a4key;
+        case KEY_ALT: return ALLEGRO_KEY_ALT;
+        case KEY_ALTGR: return ALLEGRO_KEY_ALTGR;
+        case KEY_LWIN: return ALLEGRO_KEY_LWIN;
+        case KEY_RWIN: return ALLEGRO_KEY_RWIN;
+        case KEY_MENU: return ALLEGRO_KEY_MENU;
+        case KEY_SCRLOCK: return ALLEGRO_KEY_SCROLLLOCK;
+        case KEY_NUMLOCK: return ALLEGRO_KEY_NUMLOCK;
+        case KEY_CAPSLOCK: return ALLEGRO_KEY_CAPSLOCK;
+        default: return 0;
     }
 }
 
