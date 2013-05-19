@@ -944,6 +944,7 @@ void textout_centre_ex(struct BITMAP *bmp, struct FONT *f, AL_CONST char *str, i
             y + al_get_font_line_height(f->real), a5color(bg, current_depth));
     }
     al_draw_text(f->real, text_color(color, current_depth), x, y, ALLEGRO_ALIGN_CENTRE, str);
+    maybe_flip_screen(bmp);
 }
 
 void textout_right_ex(struct BITMAP *bmp, struct FONT *f, AL_CONST char *str, int x, int y, int color, int bg){
@@ -955,6 +956,7 @@ void textout_right_ex(struct BITMAP *bmp, struct FONT *f, AL_CONST char *str, in
             y + al_get_font_line_height(f->real), a5color(bg, current_depth));
     }
     al_draw_text(f->real, text_color(color, current_depth), x, y, ALLEGRO_ALIGN_RIGHT, str);
+    maybe_flip_screen(bmp);
 }
 
 void textprintf_right_ex(struct BITMAP *bmp, struct FONT *f, int x, int y, int color, int bg, AL_CONST char *format, ...){
