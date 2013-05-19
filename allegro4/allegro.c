@@ -584,7 +584,11 @@ int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualh
             display = NULL;
         }
     }
-    return is_ok(display != NULL);
+    if (display) {
+        al_register_event_source(system_event_queue, al_get_display_event_source(display));
+        return 0;
+    }
+    return -1;
 }
 
 /*
@@ -776,8 +780,6 @@ static void handle_mouse_event(ALLEGRO_MOUSE_EVENT *event) {
 
 static void *system_thread_func(ALLEGRO_THREAD * self, void * arg){
 
-    bool have_display = false;
-
     ALLEGRO_TIMER *retrace_timer = al_create_timer(1.0 / 60);
     al_register_event_source(system_event_queue, al_get_timer_event_source(retrace_timer));
     al_start_timer(retrace_timer);
@@ -806,13 +808,6 @@ static void *system_thread_func(ALLEGRO_THREAD * self, void * arg){
             event.type == ALLEGRO_EVENT_MOUSE_BUTTON_UP)
         {
             handle_mouse_event(&event.mouse);
-        }
-        /* XXX unnecessary */
-        if (!have_display) {
-            if (display) {
-                have_display = true;
-                al_register_event_source(system_event_queue, al_get_display_event_source(display));
-            }
         }
     }
 
