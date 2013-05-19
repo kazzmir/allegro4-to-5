@@ -204,6 +204,8 @@ typedef struct SYSTEM_DRIVER
 AL_VAR(SYSTEM_DRIVER, system_none);
 AL_VAR(SYSTEM_DRIVER *, system_driver);
 
+AL_FUNC(void, set_window_title, (AL_CONST char *name));
+
 
 #ifdef __cplusplus
    }

@@ -177,7 +177,7 @@ void load_text(void)
             inblank = TRUE;
 
             for (i = 0; i < (int)(sizeof(sect) / sizeof(sect[0])); i++) {
-               if (stricmp(s, sect[i].desc) == 0) {
+               if (strcmp(s, sect[i].desc) == 0) {
                   sec = &sect[i];
                   break;
                }
@@ -275,7 +275,7 @@ void sort_credit_list(void)
          n = 0;
 
          if (n == 0) {
-            n = stricmp(p->name, p->next->name);
+            n = strcmp(p->name, p->next->name);
          }
 
          if (n > 0) {
@@ -307,7 +307,7 @@ void load_credits(void)
       return;
 
    while (pack_fgets(buf, sizeof(buf) - 1, f) != 0) {
-      if (stricmp(buf, "Thanks!") == 0)
+      if (strcmp(buf, "Thanks!") == 0)
          break;
 
       while ((p = strstr(buf, "&lt")) != NULL) {

@@ -4,7 +4,18 @@
 #include <allegro5/allegro.h>
 
 void set_palette(const PALETTE palette){
-    memcpy(current_palette, palette, sizeof(PALETTE));
+    set_palette_range(palette, 0, 255, FALSE);
+}
+
+void set_palette_range(AL_CONST PALETTE p, int from, int to, int retracesync)
+{
+    int i;
+    if (retracesync) {
+        al_wait_for_vsync();
+    }
+    for (i = from; i <= to; i++) {
+        current_palette[i] = p[i];
+    }
 }
 
 void get_palette(PALETTE palette){

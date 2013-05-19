@@ -170,7 +170,7 @@ int clock_proc(int msg, DIALOG *d, int c)
 	 draw_hand(temp, the_time.tm_hour, 12, the_time.tm_min, 60, itofix(1)/2, d->fg);
 
 	 /* copy the temporary bitmap onto the screen */
-	 blit(temp, screen, 0, 0, d->x, d->y, d->w, d->h);
+	 blit(temp, gui_get_screen(), 0, 0, d->x, d->y, d->w, d->h);
 	 destroy_bitmap(temp);
 	 break; 
    }

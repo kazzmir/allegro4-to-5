@@ -18,6 +18,8 @@ int _rgb_g_shift_32 = DEFAULT_RGB_G_SHIFT_32;
 int _rgb_b_shift_32 = DEFAULT_RGB_B_SHIFT_32;
 int _rgb_a_shift_32 = DEFAULT_RGB_A_SHIFT_32;
 
+PALETTE black_palette;
+
 PALETTE desktop_palette = 
 {
    { 63, 63, 63, 0 },   { 63, 0,  0,  0 },   { 0,  63, 0,  0 },   { 63, 63, 0,  0 },
@@ -336,5 +338,33 @@ void fade_in(AL_CONST PALETTE p, int speed){
 }
 
 void fade_out(int speed){
-    /* TODO */
+    ALLEGRO_STATE state;
+    ALLEGRO_BITMAP *scr;
+    ALLEGRO_BITMAP *copy;
+    ALLEGRO_TRANSFORM t;
+    int c;
+
+    scr = screen->real;
+    copy = al_clone_bitmap(scr);
+
+    al_store_state(&state,
+	ALLEGRO_STATE_TARGET_BITMAP | ALLEGRO_STATE_BLENDER |
+	ALLEGRO_STATE_TRANSFORM);
+    al_set_target_bitmap(scr);
+    al_set_blender(ALLEGRO_ADD, ALLEGRO_ONE, ALLEGRO_ZERO);
+    al_identity_transform(&t);
+    al_use_transform(&t);
+
+    for (c=255; c>=0; c-=4*speed) {
+        int i = MID(0, c, 255);
+        /* twice */
+        al_draw_tinted_bitmap(copy, al_map_rgb(i, i, i), 0, 0, 0);
+        al_flip_display();
+        al_draw_tinted_bitmap(copy, al_map_rgb(i, i, i), 0, 0, 0);
+        al_flip_display();
+    }
+
+    al_restore_state(&state);
+
+    al_destroy_bitmap(copy);
 }
