@@ -32,14 +32,17 @@ int * allegro_errno = &_allegro_errno;
 char allegro_id[] = "Allegro 4 to 5 Layer Version 0.1";
 char allegro_error[ALLEGRO_ERROR_SIZE];
 
-volatile char key[KEY_MAX];
-static KEYBUFFER_ENTRY keybuffer[KEYBUFFER_LENGTH];
-static int keybuffer_pos;
-volatile int key_shifts;
+static ALLEGRO_THREAD *system_thread;
+static ALLEGRO_EVENT_QUEUE *system_event_queue;
 static ALLEGRO_MUTEX *keybuffer_mutex;
 static ALLEGRO_COND *keybuffer_cond;
 static ALLEGRO_EVENT_SOURCE keybuffer_event_source;
 const unsigned USER_EVENT_CLEAR_KEYBUF = ALLEGRO_GET_EVENT_TYPE('4','C','K','B');
+
+volatile char key[KEY_MAX];
+static KEYBUFFER_ENTRY keybuffer[KEYBUFFER_LENGTH];
+static int keybuffer_pos;
+volatile int key_shifts;
 
 SYSTEM_DRIVER _system_driver = {0, "A5", "A5", "A5"};
 SYSTEM_DRIVER *system_driver = &_system_driver;
@@ -123,7 +126,6 @@ int _rgb_scale_6[64] =
 
 /* forward declarations */
 static void lazily_create_real_bitmap(BITMAP *bitmap, int is_mono_font);
-static void start_key_thread(void);
 
 
 /* allegro4 uses 0 as ok values */
@@ -613,6 +615,8 @@ int install_timer(){
 
 int install_mouse(){
     if (al_install_mouse()) {
+        al_register_event_source(system_event_queue,
+            al_get_mouse_event_source());
         return al_get_mouse_num_buttons();
     }
     return -1;
@@ -620,7 +624,8 @@ int install_mouse(){
 
 int install_keyboard(){
     if (al_install_keyboard()) {
-        start_key_thread();
+        al_register_event_source(system_event_queue, al_get_keyboard_event_source());
+        al_register_event_source(system_event_queue, &keybuffer_event_source);
         return 0;
     }
     return -1;
@@ -720,112 +725,109 @@ static void update_keyshifts(int key, int down){
     }
 }
 
-static void * read_keys(ALLEGRO_THREAD * self, void * arg){
-
-    ALLEGRO_EVENT_QUEUE * queue = al_create_event_queue();
-    al_register_event_source(queue, al_get_keyboard_event_source());
-    al_register_event_source(queue, al_get_mouse_event_source());
-    al_register_event_source(queue, &keybuffer_event_source);
-
-    while (true){
-        ALLEGRO_EVENT event;
-        al_wait_for_event(queue, &event);
-        if (event.type == ALLEGRO_EVENT_KEY_DOWN){
-            int k = a4key(event.keyboard.keycode);
-            key[k] = 1;
-            update_keyshifts(event.keyboard.keycode, TRUE);
-            if (keyboard_lowlevel_callback) {
-                keyboard_lowlevel_callback(k);
-            }
-        } else if (event.type == ALLEGRO_EVENT_KEY_UP){
-            int k = a4key(event.keyboard.keycode);
-            key[k] = 0;
-            update_keyshifts(event.keyboard.keycode, FALSE);
-            if (keyboard_lowlevel_callback) {
-                keyboard_lowlevel_callback(k + 128);
-            }
-        } else if (event.type == ALLEGRO_EVENT_KEY_CHAR){
-            al_lock_mutex(keybuffer_mutex);
-            if (keybuffer_pos < KEYBUFFER_LENGTH) {
-                keybuffer[keybuffer_pos].unicode = event.keyboard.unichar;
-                keybuffer[keybuffer_pos].keycode = event.keyboard.keycode;
-                /* This depends on the identical correspondence of modifier
-                 * flags between A4 and A5.
-                 */
-                keybuffer[keybuffer_pos].modifiers = event.keyboard.modifiers;
-                keybuffer_pos++;
-                al_broadcast_cond(keybuffer_cond);
-            }
-            al_unlock_mutex(keybuffer_mutex);
-        } else if (event.type == USER_EVENT_CLEAR_KEYBUF) {
-            al_lock_mutex(keybuffer_mutex);
-            keybuffer_pos = 0;
-            al_broadcast_cond(keybuffer_cond);
-            al_unlock_mutex(keybuffer_mutex);
-        } else if (event.type == ALLEGRO_EVENT_MOUSE_AXES){
-            mouse_w = event.mouse.w;
-            mouse_x = event.mouse.x;
-            mouse_y = event.mouse.y;
-            mouse_z = event.mouse.z;
-        } else if (event.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN){
-            mouse_b |= 1 << (event.mouse.button - 1);
-        } else if (event.type == ALLEGRO_EVENT_MOUSE_BUTTON_UP){
-            mouse_b &= ~(1 << (event.mouse.button - 1));
+static void handle_keyboard_event(ALLEGRO_EVENT *event) {
+    if (event->type == ALLEGRO_EVENT_KEY_DOWN){
+        int k = a4key(event->keyboard.keycode);
+        key[k] = 1;
+        update_keyshifts(event->keyboard.keycode, TRUE);
+        if (keyboard_lowlevel_callback) {
+            keyboard_lowlevel_callback(k);
         }
+    } else if (event->type == ALLEGRO_EVENT_KEY_UP){
+        int k = a4key(event->keyboard.keycode);
+        key[k] = 0;
+        update_keyshifts(event->keyboard.keycode, FALSE);
+        if (keyboard_lowlevel_callback) {
+            keyboard_lowlevel_callback(k + 128);
+        }
+    } else if (event->type == ALLEGRO_EVENT_KEY_CHAR){
+        al_lock_mutex(keybuffer_mutex);
+        if (keybuffer_pos < KEYBUFFER_LENGTH) {
+            keybuffer[keybuffer_pos].unicode = event->keyboard.unichar;
+            keybuffer[keybuffer_pos].keycode = event->keyboard.keycode;
+            /* This depends on the identical correspondence of modifier
+             * flags between A4 and A5.
+             */
+            keybuffer[keybuffer_pos].modifiers = event->keyboard.modifiers;
+            keybuffer_pos++;
+            al_broadcast_cond(keybuffer_cond);
+        }
+        al_unlock_mutex(keybuffer_mutex);
+    } else if (event->type == USER_EVENT_CLEAR_KEYBUF) {
+        al_lock_mutex(keybuffer_mutex);
+        keybuffer_pos = 0;
+        al_broadcast_cond(keybuffer_cond);
+        al_unlock_mutex(keybuffer_mutex);
     }
-
-    return NULL;
 }
 
-static void *system_thread(ALLEGRO_THREAD * self, void * arg){
+static void handle_mouse_event(ALLEGRO_MOUSE_EVENT *event) {
+    if (event->type == ALLEGRO_EVENT_MOUSE_AXES){
+        mouse_w = event->w;
+        mouse_x = event->x;
+        mouse_y = event->y;
+        mouse_z = event->z;
+    } else if (event->type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN){
+        mouse_b |= 1 << (event->button - 1);
+    } else if (event->type == ALLEGRO_EVENT_MOUSE_BUTTON_UP){
+        mouse_b &= ~(1 << (event->button - 1));
+    }
+}
 
-    ALLEGRO_EVENT_QUEUE * queue = al_create_event_queue();
-   bool have_display = false;
+static void *system_thread_func(ALLEGRO_THREAD * self, void * arg){
 
-    ALLEGRO_TIMER *timer = al_create_timer(1.0 / 60);
-    al_start_timer(timer);
-    al_register_event_source(queue, al_get_timer_event_source(timer));
+    bool have_display = false;
+
+    ALLEGRO_TIMER *retrace_timer = al_create_timer(1.0 / 60);
+    al_register_event_source(system_event_queue, al_get_timer_event_source(retrace_timer));
+    al_start_timer(retrace_timer);
     
     while (true){
         ALLEGRO_EVENT event;
-        al_wait_for_event(queue, &event);
+        al_wait_for_event(system_event_queue, &event);
         if (event.type == ALLEGRO_EVENT_TIMER){
-            retrace_count++;
+            if (event.timer.source == retrace_timer) {
+                retrace_count++;
+            }
         }
-       if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE){
-          if (close_button_callback)
-             close_button_callback();
-       }
-       if (!have_display) {
-          if (display) {
-             have_display = true;
-             al_register_event_source(queue, al_get_display_event_source(display));
-          }
-       }
+        else if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE){
+            if (close_button_callback)
+                close_button_callback();
+        }
+        else if (event.type == ALLEGRO_EVENT_KEY_DOWN ||
+            event.type == ALLEGRO_EVENT_KEY_UP ||
+            event.type == ALLEGRO_EVENT_KEY_CHAR ||
+            event.type == USER_EVENT_CLEAR_KEYBUF)
+        {
+            handle_keyboard_event(&event);
+        }
+        else if (event.type == ALLEGRO_EVENT_MOUSE_AXES ||
+            event.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN ||
+            event.type == ALLEGRO_EVENT_MOUSE_BUTTON_UP)
+        {
+            handle_mouse_event(&event.mouse);
+        }
+        /* XXX unnecessary */
+        if (!have_display) {
+            if (display) {
+                have_display = true;
+                al_register_event_source(system_event_queue, al_get_display_event_source(display));
+            }
+        }
     }
 
     return NULL;
 }
 
-static void start_key_thread(){
-    ALLEGRO_THREAD * thread;
-
+static bool start_system_thread(){
     /* XXX never cleaned up */
+    system_thread = al_create_thread(system_thread_func, NULL);
+    system_event_queue = al_create_event_queue();
     keybuffer_mutex = al_create_mutex();
     keybuffer_cond = al_create_cond();
     al_init_user_event_source(&keybuffer_event_source);
-    thread = al_create_thread(read_keys, NULL);
-    if (thread != NULL){
-        al_start_thread(thread);
-    } else {
-        printf("Could not start key thread!\n");
-    }
-}
-
-static bool start_system_thread(){
-    ALLEGRO_THREAD * thread = al_create_thread(system_thread, NULL);
-    if (thread != NULL){
-        al_start_thread(thread);
+    if (system_thread && system_event_queue && keybuffer_mutex && keybuffer_cond) {
+        al_start_thread(system_thread);
         return true;
     }
     return false;
