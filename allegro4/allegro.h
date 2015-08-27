@@ -84,7 +84,7 @@ extern int current_depth;
 
 unsigned int _default_ds();
 
-// extern int AL_RAND();
+extern int AL_RAND();
 
 #define bmp_read8(addr)             (*((uint8_t  *)(addr)))
 #define bmp_write8(addr, c)         (*((uint8_t  *)(addr)) = (c))
