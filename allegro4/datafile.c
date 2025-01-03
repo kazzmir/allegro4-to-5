@@ -22,6 +22,7 @@
 
 #include "allegro.h"
 #include "include/internal/aintern.h"
+#include "include/internal/alconfig.h"
 
 #include <allegro5/allegro.h>
 #include <allegro5/allegro_font.h>
