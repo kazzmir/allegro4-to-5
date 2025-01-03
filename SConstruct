@@ -112,16 +112,16 @@ def allegroLibrary():
     allegro_store[0] = library
     return allegro_store[0]
 
-def makeExample(name, source):
+def makeExample(source):
     env = allegro4Environment()
-    env.VariantDir('build/examples', 'examples')
-    return env.Program(name, map(lambda x: 'build/examples/%s' % x, source))
+    env.VariantDir('build/examples', 'examples', duplicate = False)
+    return env.Program('build/examples/' + source)
 
 def stars():
-    return makeExample('exstars', ['exstars.c'])
+    return makeExample('exstars.c')
 
 def shade():
-    return makeExample('exshade', ['exshade.c'])
+    return makeExample('exshade.c')
 
 
 def demos():
@@ -132,6 +132,6 @@ def demos():
 examples = glob.glob("examples/*.c")
 for example in examples:
     name = re.sub(r"examples/(.*?)\.c", r"\1", example)
-    makeExample(name, [name + ".c"])
+    makeExample(name + ".c")
 
 demos()
