@@ -1760,7 +1760,7 @@ void set_keyboard_rate(int delay, int repeat){
 
 void set_config_int(AL_CONST char *section, AL_CONST char *name, int val){
    char sval[1024];
-   snprintf(sval, sizeof val, "%d", val);
+   snprintf(sval, sizeof sval, "%d", val);
    set_config_string(section, name, sval);
 }
 
