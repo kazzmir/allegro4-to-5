@@ -290,11 +290,11 @@ void clear_keybuf(){
     al_unlock_mutex(keybuffer_mutex);
 }
 
-void simulate_keypress(int k){
+void simulate_ukeypress(int k, int scancode) {
     al_lock_mutex(keybuffer_mutex);
     if (keybuffer_pos < KEYBUFFER_LENGTH) {
-        keybuffer[keybuffer_pos].unicode = k & 255;
-        keybuffer[keybuffer_pos].keycode = k >> 8;
+        keybuffer[keybuffer_pos].unicode = k;
+        keybuffer[keybuffer_pos].keycode = scancode;
         keybuffer[keybuffer_pos].modifiers = 0;
         keybuffer_pos++;
     }
