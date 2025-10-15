@@ -1916,3 +1916,21 @@ void arc(BITMAP * buffer, int x, int y, fixed ang1, fixed ang2, int r, int color
     draw_into(buffer);
     al_draw_arc(x, y, r, fixangle_to_radians(ang1), fixangle_to_radians(ang2), a5color(color, current_depth), 1);
 }
+
+#ifdef ALLEGRO_WINDOWS
+/* _al_drive_exists:
+ *  Checks whether the specified drive is valid.
+ */
+int _al_drive_exists(int drive)
+{
+   return GetLogicalDrives() & (1 << drive);
+}
+
+/* _al_getdrive:
+ *  Returns the current drive number (0=A, 1=B, etc).
+ */
+int _al_getdrive(void)
+{
+    return _getdrive() - 1;
+}
+#endif

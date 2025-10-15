@@ -27,6 +27,11 @@
    extern "C" {
 #endif
 
+#ifdef ALLEGRO_WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#define NOGDI
+#include <windows.h>
+#endif
 
 /* length in bytes of the cpu_vendor string */
 #define _AL_CPU_VENDOR_SIZE 32
