@@ -78,6 +78,8 @@ SAMPLE *load_sample(AL_CONST char *filename)
 }
 
 void destroy_sample(SAMPLE *sample){
+    if (!sample) return;
+
     if (sample->real) {
         al_destroy_sample(sample->real);
     }
