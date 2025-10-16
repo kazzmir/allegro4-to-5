@@ -60,6 +60,7 @@ GFX_DRIVER _gfx_driver = {0, "A5", "A5", "A5", 0, 0, 0, 0, 0, 0, 0, 0};
 GFX_DRIVER *gfx_driver = &_gfx_driver;
 void (*keyboard_lowlevel_callback)(int scancode);
 BITMAP * screen;
+static A425_TLS BITMAP *current_bitmap = NULL;
 static int screen_refresh_held = 0;
 static FONT _font;
 struct FONT * font = &_font;
@@ -949,6 +950,9 @@ void allegro_exit(void) {
 }
 
 static void draw_into(BITMAP *bitmap){
+	if (current_bitmap == bitmap)
+        return;
+
     lazily_create_real_bitmap(bitmap, 0);
     if (al_is_bitmap_locked(bitmap->real))
         al_unlock_bitmap(bitmap->real);

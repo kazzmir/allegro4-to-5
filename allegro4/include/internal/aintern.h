@@ -31,6 +31,13 @@
 /* length in bytes of the cpu_vendor string */
 #define _AL_CPU_VENDOR_SIZE 32
 
+/* define ALLEGRO425_ONETHREAD if only one thread will be drawing at a time
+ * to current_bitmap etc */
+#ifdef ALLEGRO425_ONETHREAD
+   #define A425_TLS
+#else
+   #define A425_TLS _Thread_local
+#endif
 
 /* flag for how many times we have been initialised */
 AL_VAR(int, _allegro_count);
