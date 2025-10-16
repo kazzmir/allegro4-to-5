@@ -1,22 +1,32 @@
-Provides the Allegro4 API on top of the Allegro5 implementation. 
+**Allegro4 API Wrapper for Allegro5**
 
-```shell
+This project provides the Allegro4 API implemented on top of Allegro5.
+
+### Build
+
+```sh
 make
 ```
 
-examples
-```shell
+### Run Examples
+
+Copy the required data files and run an example:
+
+```sh
 cp *.dat build/examples/
 ./build/examples/exgui
 ```
 
-demos
-```shell
+### Run Demos
+
+```sh
 (cd demos/sopwith && ../../build/demos/sopwith/sopwith)
 ```
 
+### Build Static Library
 
-```shell
+To generate `liballegro4-to-5.a`:
+
+```sh
 make library
 ```
-Will generated `build/allegro/liballegro4-to-5.a`
