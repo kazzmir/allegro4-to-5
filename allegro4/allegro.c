@@ -565,12 +565,12 @@ void set_color_conversion(int mode){
 
 int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualheight){
     int i;
-    if (card == GFX_TEXT) {
-        if (display)
-            al_destroy_display(display);
+    if (display) {
+        al_destroy_display(display);
         display = NULL;
-        return 0;
     }
+    if (card == GFX_TEXT)
+        return 0;
     display = al_create_display(width, height);
     if (display) {
         if (window_title[0]) {
@@ -589,8 +589,6 @@ int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualh
             al_destroy_display(display);
             display = NULL;
         }
-    }
-    if (display) {
         al_register_event_source(system_event_queue, al_get_display_event_source(display));
         return 0;
     }
