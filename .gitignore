@@ -1,0 +1,5 @@
+.vscode
+.sconsign.dblite
+.sconf_temp
+build
+config.log
