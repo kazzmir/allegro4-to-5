@@ -150,7 +150,7 @@ int change_gfx_mode(void)
    /* In windowed mode the desktop color depth takes preference to the
       user specified colour depth for performance reasons. */
    if (fullscreen == 0) {
-      bit_depth = desktop_color_depth();
+      bit_depth = get_color_depth();
    }
 
    /* Select appropriate (fullscreen or windowed) gfx mode driver. */

@@ -38,7 +38,7 @@ static volatile int timer = 0;
 static void timer_f(void)
 {
    timer++;
-} END_OF_STATIC_FUNCTION();
+}
 
 /* Screenshot module; for taking screenshots. */
 static SCREENSHOT *screenshot = NULL;

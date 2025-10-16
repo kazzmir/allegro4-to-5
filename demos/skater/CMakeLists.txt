@@ -39,10 +39,10 @@ set(SKATER_SOURCES
     source/virtctl.c
     )
 
-add_our_executable(skater WIN32 ${SKATER_SOURCES})
+add_executable(skater WIN32 ${SKATER_SOURCES})
 
 if(SUPPORT_ALLEGROGL)
-    add_our_executable(skater_agl WIN32 ${SKATER_SOURCES})
+    add_executable(skater_agl WIN32 ${SKATER_SOURCES})
     set_target_properties(skater_agl
         PROPERTIES
         COMPILE_FLAGS -DDEMO_USE_ALLEGRO_GL
@@ -50,10 +50,20 @@ if(SUPPORT_ALLEGROGL)
     target_link_libraries(skater_agl allegrogl)
 endif(SUPPORT_ALLEGROGL)
 
+function(copy_files name)
+    foreach(file IN LISTS ARGN)
+        add_custom_command(
+            OUTPUT ${CMAKE_BINARY_DIR}/${file}
+            COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/${file} ${CMAKE_BINARY_DIR}/${file}
+        )
+    endforeach()
+endfunction()
+
 copy_files(copy_skater_data
     demo.dat
     level.dat
     )
+
 
 #-----------------------------------------------------------------------------#
 # vim: set sts=4 sw=4 et:

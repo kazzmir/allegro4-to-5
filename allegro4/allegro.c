@@ -533,6 +533,7 @@ struct BITMAP * load_bmp(AL_CONST char *filename, struct RGB *pal){
 }
 
 void destroy_bitmap(BITMAP* bitmap){
+    if (!bitmap) return;
     if (bitmap->real) al_destroy_bitmap(bitmap->real);
     al_free(bitmap);
 }
@@ -1773,6 +1774,11 @@ int desktop_color_depth(void){
     return 32;
 }
 
+// MINE
+int get_color_depth(){
+    return current_depth;
+}
+
 void voice_start(int voice){
     /* FIXME */
 }
@@ -1869,8 +1875,20 @@ int get_display_switch_mode(){
 
 void remove_display_switch_callback(void (*cb)()){
 }
+// Keeps track of the current drawing target
+static ALLEGRO_BITMAP *selected_bitmap = NULL;
 
+//Equivalent to Allegro 4's bmp_select()
 void bmp_select(BITMAP *bitmap){
+    if (bitmap && bitmap->real) {
+        selected_bitmap = bitmap->real;
+        al_set_target_bitmap(selected_bitmap);
+    } else {
+        selected_bitmap = NULL;
+        ALLEGRO_DISPLAY *display = al_get_current_display();
+        if (display)
+            al_set_target_backbuffer(display);
+    }
 }
 
 uintptr_t bmp_read_line(BITMAP *bitmap, int row){

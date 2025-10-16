@@ -463,6 +463,7 @@ AL_FUNC(void, remove_display_switch_callback, (AL_METHOD(void, cb, (void))));
 
 AL_FUNC(void, lock_bitmap, (struct BITMAP *bmp));
 
+AL_FUNC(void, bmp_select, (BITMAP *bitmap));
 AL_FUNC(uintptr_t, bmp_write_line, (BITMAP *bmp, int lyne));
 AL_FUNC(uintptr_t, bmp_read_line, (BITMAP *bmp, int lyne));
 AL_FUNC(void, bmp_unwrite_line, (BITMAP *bmp));
