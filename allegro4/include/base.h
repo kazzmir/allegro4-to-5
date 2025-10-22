@@ -26,9 +26,6 @@
 #define AL_ARRAY(type, name)                    extern type name[]
 #define AL_ID(a,b,c,d)     (((a)<<24) | ((b)<<16) | ((c)<<8) | (d))
 #define ZERO_SIZE_ARRAY(type, name)  type name[]
-#define LOCK_FUNCTION(_)
-#define LOCK_VARIABLE(_)
-#define END_OF_FUNCTION(_)
 
 extern int * allegro_errno;
 
