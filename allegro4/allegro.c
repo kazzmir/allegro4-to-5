@@ -1897,6 +1897,14 @@ int get_color_depth(){
     return current_depth;
 }
 
+int get_desktop_resolution(int *width, int *height) {
+    ALLEGRO_MONITOR_INFO info;
+    al_get_monitor_info(0, &info);
+    *width = info.x2 - info.x1;
+    *height = info.y2 - info.y1;
+    return 0;
+}
+
 void voice_start(int voice){
     /* FIXME */
 }
