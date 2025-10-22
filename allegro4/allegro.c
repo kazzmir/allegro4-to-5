@@ -851,6 +851,9 @@ static void *system_thread_func(ALLEGRO_THREAD * self, void * arg){
 
 static bool start_system_thread(){
     system_thread = al_create_thread(system_thread_func, NULL);
+#if defined(DEBUGMODE) && defined(ALLEGRO_WINDOWS)
+	SetThreadDescription(*(HANDLE*)system_thread, L"Allegro 4 to 5 System Thread");
+#endif
     system_event_queue = al_create_event_queue();
     timer_mutex = al_create_mutex();
     keybuffer_mutex = al_create_mutex();
