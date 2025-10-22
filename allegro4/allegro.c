@@ -12,6 +12,8 @@
 
 #define VERSION_5_1_0 0x05010000
 
+ALLEGRO_DEBUG_CHANNEL("a425")
+
 typedef struct TIMER {
     ALLEGRO_TIMER *timer;
     void (*callback)();
@@ -1565,6 +1567,11 @@ void pop_config_state(){
 void override_config_file(AL_CONST char *filename)
 {
    set_config_file(filename);
+}
+
+void override_config_data(AL_CONST char *data, int length)
+{
+   ALLEGRO_WARN("Not implemented\n");
 }
 
 void set_config_file(char const *filename){
