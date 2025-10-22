@@ -7,6 +7,8 @@
 #include <allegro5/allegro5.h>
 #include <allegro5/allegro_font.h>
 
+ALLEGRO_DEBUG_CHANNEL("a425")
+
 /* color_get_font_ranges:
  *  (color vtable entry)
  *  Returns the number of character ranges in a font, or -1 if that information
@@ -374,19 +376,136 @@ void destroy_font(FONT *f){
     al_free(f);
 }
 
+/* font_find_character & bitmap_font_count are taken from A5/addons/font/fontbmp.c verbatim  */
+static void font_find_character(uint32_t *data, int pitch,
+    int bmp_w, int bmp_h,
+    int *x, int *y, int *w, int *h)
+{
+    /* The pixel at position 0/0 is used as background color. */
+    uint32_t c = data[0];
+    pitch >>= 2;
+
+    /* look for top left corner of character */
+    while (1) {
+        /* Reached border? */
+        if (*x >= bmp_w - 1) {
+            *x = 0;
+            (*y)++;
+            if (*y >= bmp_h - 1) {
+                *w = 0;
+                *h = 0;
+                return;
+            }
+        }
+        if (
+            data[*x + *y * pitch] == c &&
+            data[(*x + 1) + *y * pitch] == c &&
+            data[*x + (*y + 1) * pitch] == c &&
+            data[(*x + 1) + (*y + 1) * pitch] != c) {
+            break;
+        }
+        (*x)++;
+    }
+
+    /* look for right edge of character */
+    *w = 1;
+    while ((*x + *w + 1 < bmp_w) &&
+        data[(*x + *w + 1) + (*y + 1) * pitch] != c) {
+        (*w)++;
+    }
+
+    /* look for bottom edge of character */
+    *h = 1;
+    while ((*y + *h + 1 < bmp_h) &&
+        data[*x + 1 + (*y + *h + 1) * pitch] != c) {
+        (*h)++;
+    }
+}
+
+/* bitmap_font_count:
+ *  Helper for `import_bitmap_font', below.
+ */
+static int bitmap_font_count(ALLEGRO_BITMAP *bmp)
+{
+    int x = 0, y = 0, w = 0, h = 0;
+    int num = 0;
+    ALLEGRO_LOCKED_REGION *lock;
+
+    lock = al_lock_bitmap(bmp, ALLEGRO_PIXEL_FORMAT_RGBA_8888,
+        ALLEGRO_LOCK_READONLY);
+
+    while (1) {
+        font_find_character(lock->data, lock->pitch,
+            al_get_bitmap_width(bmp), al_get_bitmap_height(bmp),
+            &x, &y, &w, &h);
+        if (w <= 0 || h <= 0)
+            break;
+        num++;
+        x += w;
+    }
+
+    al_unlock_bitmap(bmp);
+
+    return num;
+}
+
+/* import routine for the Allegro .pcx font format heavily based on al_grab_font_from_bitmap */
+FONT *load_bitmap_font(AL_CONST char *fname, RGB *pal, void *param){
+    ALLEGRO_BITMAP *import_bmp;
+    ALLEGRO_STATE backup;
+    int range[2];
+    PACKFILE *p = pack_fopen(fname, F_READ);
+    if (!p)
+        return NULL;
+    const char *ident = strrchr(fname, '.');
+    al_store_state(&backup, ALLEGRO_STATE_NEW_BITMAP_PARAMETERS);
+    al_set_new_bitmap_flags(ALLEGRO_MEMORY_BITMAP);
+    al_set_new_bitmap_format(ALLEGRO_PIXEL_FORMAT_ANY_WITH_ALPHA);
+    import_bmp = al_load_bitmap_flags_f((ALLEGRO_FILE *)p, ident, 0);
+    al_restore_state(&backup);
+    pack_fclose(p);
+    if (!import_bmp) {
+        ALLEGRO_ERROR("Couldn't load bitmap from '%s'\n", fname);
+        return NULL;
+    }
+
+    FONT *f = al_calloc(1, sizeof * f);
+    f->data = NULL;
+    f->is_color = false;
+
+    /* We assume a single unicode range, starting at the space
+     * character.
+     */
+    range[0] = 32;
+    range[1] = 32 + bitmap_font_count(import_bmp) - 1;
+
+    al_convert_mask_to_alpha(import_bmp, al_map_rgb(255, 0, 255));
+    /* TODO: There are some fonts with non-transparent bg (blue 0x0000aa on black) like in agup
+     * maybe fix things up manually as we count characters instead? */
+    al_convert_mask_to_alpha(import_bmp, al_map_rgb(0, 0, 0));
+
+    f->real = al_grab_font_from_bitmap(import_bmp, 1, range);
+
+    al_destroy_bitmap(import_bmp);
+
+    return f;
+}
+
 FONT *load_font(char const *name, RGB *pal, void *param){
-    FONT *f = al_calloc(1, sizeof *f);
+    FONT *f;
     int len = strlen(name);
     if (len >= 4 && !strcmp(name + len - 4, ".dat")){
+        f = al_calloc(1, sizeof *f);
         DATAFILE *dat = load_datafile(name);
         FONT *df = dat->dat;
         f->data = df->data;
-    }
+        if (!f->is_color) {
+           FONT *u = upgrade_to_color(f);
+           *f = *u;
+        }
+    } else
+        f = load_bitmap_font(name, pal, param);
     
-    if (!f->is_color) {
-       FONT *u = upgrade_to_color(f);
-       *f = *u;
-    }
     return f;
 }
 
