@@ -2,7 +2,7 @@ Import('env')
 
 source = Split("""allegro.c math3d.c math.c file.c unicode.c color.c clip3df.c
 datafile.c lzss.c dataregi.c gui.c guiproc.c font.c quat.c sound.c palette.c
-ufile.c fsel.c
+ufile.c fsel.c inline.c
 """)
 library = env.StaticLibrary('allegro4-to-5', source)
 Return('library')
