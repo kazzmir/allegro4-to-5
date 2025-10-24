@@ -1,0 +1,55 @@
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository code
+      uses: actions/checkout@v4
+    - name: 💾 Cache downloaded Pacman packages on Windows
+      if: runner.os == 'Windows'
+      uses: actions/cache@v4
+      with:
+        path: C:\msys64\var\cache\pacman\pkg
+        key: build-dep-windows
+    - name: 💾 Cache dependencies on MacOS
+      if: runner.os == 'macOS'
+      uses: actions/cache@v4
+      with:
+        path: ~/Library/Caches/Homebrew/downloads
+        key: build-dep-macos
+    - name: 🍺 Install dependencies on MacOS
+      if: runner.os == 'macOS'
+      run: env HOMEBREW_NO_AUTO_UPDATE=1 brew install allegro scons
+    - name: 🐧 Install dependencies on Linux
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get install -qq -y -o=Dpkg::Use-Pty=0 liballegro5-dev scons
+    - name: 🔍 Add MSYS2 to path on Windows
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        echo "C:\msys64\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "C:\msys64\ucrt64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+    - name: 🪟 Install dependencies on Windows
+      if: runner.os == 'Windows'
+      run: |
+        pacman --noconfirm -S mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-scons mingw-w64-ucrt-x86_64-allegro mingw-w64-ucrt-x86_64-pkgconf
+        sed -i "s/env = Environment(ENV = os.environ)/env = Environment(tools=['mingw'], ENV = os.environ)/" SConstruct
+    - name: ⚒ Build static
+      env:
+        MSYSTEM: UCRT64
+      run: scons -j 1
+    - name: ⚒ Build shared
+      env:
+        MSYSTEM: UCRT64
+      run: scons -j 1 build_shared=1
