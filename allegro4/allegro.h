@@ -76,15 +76,14 @@
 
 #define _mouse_screen screen
 
-// typedef struct BITMAP BITMAP;
-extern int * palette_color;
-extern BITMAP* screen;
-extern PALETTE current_palette;
-extern int current_depth;
+#define current_palette _current_palette
 
 unsigned int _default_ds();
 
-extern int AL_RAND();
+/* default random function definition */
+#ifndef AL_RAND
+   #define AL_RAND() (rand())
+#endif
 
 #define bmp_read8(addr)             (*((uint8_t  *)(addr)))
 #define bmp_write8(addr, c)         (*((uint8_t  *)(addr)) = (c))
@@ -95,7 +94,6 @@ extern int AL_RAND();
 #define OLD_FILESEL_WIDTH   -1
 #define OLD_FILESEL_HEIGHT  -1
 
-#define END_OF_MAIN()
 
 #ifdef __cplusplus
     }

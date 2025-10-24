@@ -2,10 +2,6 @@
 #include <stdlib.h>
 #include "allegro.h"
 
-int AL_RAND(){
-    return rand();
-}
-
 #include <allegro5/allegro5.h>
 #include <allegro5/allegro_primitives.h>
 #include <allegro5/allegro_image.h>
