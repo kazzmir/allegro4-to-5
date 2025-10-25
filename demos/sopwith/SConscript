@@ -2,4 +2,7 @@ Import('env')
 
 source = Split("""sopwith.cpp""")
 
-env.Program('sopwith', source)
+defines = ['$CPPDEFINES']
+if env['PLATFORM'] == 'win32':
+    defines.extend(['random=rand', 'srandom=srand'])
+env.Program('sopwith', source, CPPDEFINES=defines)
