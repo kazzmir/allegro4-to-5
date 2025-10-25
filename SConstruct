@@ -35,11 +35,19 @@ else:
 def defaultEnvironment():
     env = Environment(ENV = os.environ)
     #env.Replace(CC = "clang")
-    env.Append(CCFLAGS = ['-g3', '-Wall'])
+    env.Append(LIBPATH=[f'#{prefix}/allegro'])
+    if 'gcc' in env['TOOLS']:
+        env.Append(CCFLAGS = ['-g3', '-Wall'])
     if env['PLATFORM'] == 'darwin':
         env.Append(CPPPATH=['/opt/homebrew/include'])
         env.Append(LIBPATH=['/opt/homebrew/lib'])
         env.Append(LINKFLAGS=['-rpath', '/opt/homebrew/lib'])
+    elif 'msvc' in env['TOOLS']:
+        vcpkg_root = os.environ['VCPKG_ROOT'].replace('\\', '/')
+        env.Append(CCFLAGS=['/std:c11']) # if using _Thread_local
+        env.Append(CPPDEFINES=['ALLEGRO_NO_MAGIC_MAIN']) # to avoid forcing main() entry point for DLL
+        env.Append(CPPPATH=[f'{vcpkg_root}/installed/x64-windows/include'])
+        env.Append(LIBPATH=[f'{vcpkg_root}/installed/x64-windows/lib'])
 
     if not build_shared:
         env.MergeFlags({'CPPDEFINES': 'ALLEGRO425_STATICLINK'})
@@ -102,7 +110,9 @@ def allegro4Environment():
 
     env = cache.get_env()
 
-    env.Prepend(LIBS = [allegroLibrary(), 'm'])
+    env.Prepend(LIBS = [allegroLibrary()])
+    if 'gcc' in env['TOOLS']:
+        env.Append(LIBS = ['m'])
     # env.Prepend(LIBS = [allegroLibrary()])
     env.Append(CPPPATH = ['#allegro4'])
     return env

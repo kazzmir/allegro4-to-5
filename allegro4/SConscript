@@ -5,8 +5,10 @@ datafile.c lzss.c dataregi.c gui.c guiproc.c font.c quat.c sound.c palette.c
 ufile.c fsel.c inline.c
 """)
 
+name = 'allegro4-to-5'
 if (shared):
-	library = env.SharedLibrary('allegro4-to-5', source)
+	library = env.SharedLibrary(name, source)
 else:
-	library = env.StaticLibrary('allegro4-to-5', source)
-Return('library')
+	library = env.StaticLibrary(name, source)
+
+Return('name')
