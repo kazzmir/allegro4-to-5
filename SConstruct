@@ -36,6 +36,11 @@ def defaultEnvironment():
     env = Environment(ENV = os.environ)
     #env.Replace(CC = "clang")
     env.Append(CCFLAGS = ['-g3', '-Wall'])
+    if env['PLATFORM'] == 'darwin':
+        env.Append(CPPPATH=['/opt/homebrew/include'])
+        env.Append(LIBPATH=['/opt/homebrew/lib'])
+        env.Append(LINKFLAGS=['-rpath', '/opt/homebrew/lib'])
+
     if not build_shared:
         env.MergeFlags({'CPPDEFINES': 'ALLEGRO425_STATICLINK'})
     return env
@@ -73,7 +78,7 @@ class Cache:
         if self.allegro_libs is None:
             self.allegro_libs = ["allegro", "allegro_primitives",
 		"allegro_image", "allegro_font", "allegro_audio",
-		"allegro_acodec"]
+		"allegro_acodec", "allegro_main"]
 
             tests = {
                 "CheckPKGConfig": CheckPKGConfig,
