@@ -26,11 +26,18 @@ SetOption('num_jobs', detectCPUs())
 
 debug = ARGUMENTS.get("debug", "")
 static = ARGUMENTS.get("static", "")
+build_shared = ARGUMENTS.get("build_shared", "")
+if build_shared:
+    prefix = "build_shared"
+else:
+    prefix = "build"
 
 def defaultEnvironment():
     env = Environment(ENV = os.environ)
     #env.Replace(CC = "clang")
     env.Append(CCFLAGS = ['-g3', '-Wall'])
+    if not build_shared:
+        env.MergeFlags({'CPPDEFINES': 'ALLEGRO425_STATICLINK'})
     return env
 
 def allegro_libname(name):
@@ -100,8 +107,13 @@ def allegroLibrary():
     # Return the cached version
     if allegro_store[0] != None:
         return allegro_store[0]
-    env = defaultEnvironment()
-    library = SConscript('allegro4/SConscript', variant_dir = 'build/allegro', exports = ['env'], duplicate = False)
+    shared = build_shared
+    if build_shared:
+        env = cache.get_env();
+        env.MergeFlags({'CPPDEFINES': 'ALLEGRO425_SOURCE'})
+    else:
+        env = defaultEnvironment()
+    library = SConscript('allegro4/SConscript', variant_dir = f'{prefix}/allegro', exports = ['env', 'shared'], duplicate = False)
     Alias('library', library)
     #build = 'build-allegro'
     #env.VariantDir(build, 'allegro4')
@@ -114,8 +126,8 @@ def allegroLibrary():
 
 def makeExample(source):
     env = allegro4Environment()
-    env.VariantDir('build/examples', 'examples', duplicate = False)
-    return env.Program('build/examples/' + source)
+    env.VariantDir(f'{prefix}/examples', 'examples', duplicate = False)
+    return env.Program(f'{prefix}/examples/{source}')
 
 def stars():
     return makeExample('exstars.c')
@@ -126,7 +138,7 @@ def shade():
 
 def demos():
     env = allegro4Environment()
-    SConscript('demos/SConscript', variant_dir = 'build/demos', exports = ['env'], duplicate = False)
+    SConscript('demos/SConscript', variant_dir = f'{prefix}/demos', exports = ['env'], duplicate = False)
 
 
 examples = glob.glob("examples/*.c")
