@@ -1893,6 +1893,9 @@ int pack_fclose(PACKFILE *f)
 }
 
 
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 
 /* pack_fopen_chunk: 
  *  Opens a sub-chunk of the specified file, for reading or writing depending
