@@ -2,10 +2,6 @@
 #include <stdlib.h>
 #include "allegro.h"
 
-int AL_RAND(){
-    return rand();
-}
-
 #include <allegro5/allegro5.h>
 #include <allegro5/allegro_primitives.h>
 #include <allegro5/allegro_image.h>
@@ -60,6 +56,7 @@ GFX_DRIVER _gfx_driver = {0, "A5", "A5", "A5", 0, 0, 0, 0, 0, 0, 0, 0};
 GFX_DRIVER *gfx_driver = &_gfx_driver;
 void (*keyboard_lowlevel_callback)(int scancode);
 BITMAP * screen;
+static A425_TLS BITMAP *current_bitmap = NULL;
 static int screen_refresh_held = 0;
 static FONT _font;
 struct FONT * font = &_font;
@@ -564,12 +561,12 @@ void set_color_conversion(int mode){
 
 int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualheight){
     int i;
-    if (card == GFX_TEXT) {
-        if (display)
-            al_destroy_display(display);
+    if (display) {
+        al_destroy_display(display);
         display = NULL;
-        return 0;
     }
+    if (card == GFX_TEXT)
+        return 0;
     display = al_create_display(width, height);
     if (display) {
         if (window_title[0]) {
@@ -588,8 +585,6 @@ int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualh
             al_destroy_display(display);
             display = NULL;
         }
-    }
-    if (display) {
         al_register_event_source(system_event_queue, al_get_display_event_source(display));
         return 0;
     }
@@ -949,6 +944,9 @@ void allegro_exit(void) {
 }
 
 static void draw_into(BITMAP *bitmap){
+	if (current_bitmap == bitmap)
+        return;
+
     lazily_create_real_bitmap(bitmap, 0);
     if (al_is_bitmap_locked(bitmap->real))
         al_unlock_bitmap(bitmap->real);
@@ -1760,7 +1758,7 @@ void set_keyboard_rate(int delay, int repeat){
 
 void set_config_int(AL_CONST char *section, AL_CONST char *name, int val){
    char sval[1024];
-   snprintf(sval, sizeof val, "%d", val);
+   snprintf(sval, sizeof sval, "%d", val);
    set_config_string(section, name, sval);
 }
 
@@ -1918,3 +1916,21 @@ void arc(BITMAP * buffer, int x, int y, fixed ang1, fixed ang2, int r, int color
     draw_into(buffer);
     al_draw_arc(x, y, r, fixangle_to_radians(ang1), fixangle_to_radians(ang2), a5color(color, current_depth), 1);
 }
+
+#ifdef ALLEGRO_WINDOWS
+/* _al_drive_exists:
+ *  Checks whether the specified drive is valid.
+ */
+int _al_drive_exists(int drive)
+{
+   return GetLogicalDrives() & (1 << drive);
+}
+
+/* _al_getdrive:
+ *  Returns the current drive number (0=A, 1=B, etc).
+ */
+int _al_getdrive(void)
+{
+    return _getdrive() - 1;
+}
+#endif

@@ -125,7 +125,7 @@ static int ff_match(AL_CONST char *s1, AL_CONST char *s2)
    int index, c1, c2;
 
    /* handle NULL arguments */
-   if ((!s1) && (!s2)) {
+   if (!(s1 && s2)) {
       if (data) {
          _AL_FREE(data);
          data = NULL;

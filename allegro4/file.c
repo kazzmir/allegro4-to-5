@@ -1893,6 +1893,9 @@ int pack_fclose(PACKFILE *f)
 }
 
 
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 
 /* pack_fopen_chunk: 
  *  Opens a sub-chunk of the specified file, for reading or writing depending
@@ -1984,7 +1987,7 @@ PACKFILE *pack_fopen_chunk(PACKFILE *f, int pack)
                return NULL;
             }
             _al_sane_strncpy(chunk->normal.passdata, f->normal.passdata, strlen(f->normal.passdata)+1);
-            chunk->normal.passpos = chunk->normal.passdata + (long)f->normal.passpos - (long)f->normal.passdata;
+            chunk->normal.passpos = chunk->normal.passdata + (f->normal.passpos - f->normal.passdata);
             f->normal.passpos = f->normal.passdata;
          }
          chunk->normal.flags |= PACKFILE_FLAG_OLD_CRYPT;
@@ -2107,7 +2110,7 @@ PACKFILE *pack_fclose_chunk(PACKFILE *f)
       }
 
       if ((f->normal.passpos) && (f->normal.flags & PACKFILE_FLAG_OLD_CRYPT))
-         parent->normal.passpos = parent->normal.passdata + (long)f->normal.passpos - (long)f->normal.passdata;
+         parent->normal.passpos = parent->normal.passdata + (f->normal.passpos - f->normal.passdata);
 
       free_packfile(f);
    }

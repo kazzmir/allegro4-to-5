@@ -16,6 +16,17 @@
  */
 
 
+ /* fill in default memory locking macros */
+#ifndef END_OF_FUNCTION
+   #define END_OF_FUNCTION(x)
+   #define END_OF_STATIC_FUNCTION(x)
+   #define LOCK_DATA(d, s)
+   #define LOCK_CODE(c, s)
+   #define UNLOCK_DATA(d, s)
+   #define LOCK_VARIABLE(x)
+   #define LOCK_FUNCTION(x)
+#endif
+
 /* fill in default filename behaviour */
 #ifndef ALLEGRO_LFN
    #define ALLEGRO_LFN  1

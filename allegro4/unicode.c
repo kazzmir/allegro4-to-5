@@ -27,6 +27,7 @@
 #include <limits.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdint.h>
 
 #include "allegro.h"
 #include "include/internal/aintern.h"
@@ -736,7 +737,7 @@ int uoffset(AL_CONST char *s, int index)
       }
    }
 
-   return (long)s - (long)orig;
+   return s - orig;
 }
 
 
@@ -1782,7 +1783,7 @@ int ustrsize(AL_CONST char *s)
       last = s;
    } while (ugetxc(&s) != 0);
 
-   return (long)last - (long)orig;
+   return last - orig;
 }
 
 
@@ -1799,7 +1800,7 @@ int ustrsizez(AL_CONST char *s)
    do {
    } while (ugetxc(&s) != 0);
 
-   return (long)s - (long)orig;
+   return s - orig;
 }
 
 
@@ -2312,7 +2313,7 @@ long ustrtol(AL_CONST char *s, char **endp, int base)
    ret = strtol(t, &myendp, base);
 
    if (endp)
-      *endp = (char *)s + uoffset(s, (long)myendp - (long)t);
+      *endp = (char *)s + uoffset(s, myendp - t);
 
    return ret;
 }
@@ -2336,7 +2337,7 @@ double ustrtod(AL_CONST char *s, char **endp)
    ret = strtod(t, &myendp);
 
    if (endp)
-      *endp = (char *)s + uoffset(s, (long)myendp - (long)t);
+      *endp = (char *)s + uoffset(s, myendp - t);
 
    return ret;
 }
@@ -2396,6 +2397,9 @@ typedef struct STRING_ARG
 /* LONGEST:
  *  64-bit integers on platforms that support it, 32-bit otherwise.
  */
+#if INTPTR_MAX == INT64_MAX
+#define LONG_LONG long long
+#endif
 #ifdef LONG_LONG
    #define LONGEST LONG_LONG
 #else
@@ -2947,7 +2951,7 @@ static int decode_format_string(char *buf, STRING_ARG *string_arg, AL_CONST char
 
 	       case 'p':
 		  /* pointer */
-		  slen = sprint_hex(string_arg, &info, FALSE, (unsigned long)(va_arg(args, void *)));
+		  slen = sprint_hex(string_arg, &info, FALSE, (unsigned LONGEST)(va_arg(args, void *)));
 		  NEXT_C();
 		  break;
 

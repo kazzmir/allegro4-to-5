@@ -392,7 +392,7 @@ static FONT_COLOR_DATA *read_font_mono(PACKFILE *f, int *hmax)
       ALLEGRO_LOCKED_REGION *lock = al_lock_bitmap(mf->bitmaps[i]->real,
         ALLEGRO_PIXEL_FORMAT_ABGR_8888, ALLEGRO_LOCK_WRITEONLY);
       for (y = 0; y < h; y++) {
-          unsigned char *row = lock->data + lock->pitch * y;
+          unsigned char *row = (unsigned char *)lock->data + lock->pitch * y;
           unsigned char *source = dat + pitch * y;
           for (x = 0; x < w; x++) {
               int c = (source[(x >> 3)] & (1 << (7 - (x & 7)))) ? 255 : 0;              
