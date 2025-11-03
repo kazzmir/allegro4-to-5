@@ -129,7 +129,6 @@ def allegroLibrary():
     else:
         env = defaultEnvironment()
     library = SConscript('allegro4/SConscript', variant_dir = f'{prefix}/allegro', exports = ['env', 'shared'], duplicate = False)
-    Alias('library', library)
     #build = 'build-allegro'
     #env.VariantDir(build, 'allegro4')
     #source = Split("""allegro.c math3d.c math.c file.c unicode.c color.c clip3df.c""")
