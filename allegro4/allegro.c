@@ -82,6 +82,7 @@ static struct CONFIG *config_stack;
 static int config_stack_size;
 int _gfx_mode_set_count;
 int _allegro_count;
+int _allegro_in_exit = FALSE;
 static int color_conversion;
 void (*close_button_callback)(void);
 
@@ -886,6 +887,16 @@ static void call_constructors(void) {
    #endif
 }
 
+/* allegro_exit_stub:
+ *  Stub function registered by the library via atexit.
+ */
+static void allegro_exit_stub(void)
+{
+    _allegro_in_exit = TRUE;
+
+    allegro_exit();
+}
+
 int install_allegro(int system_id, int *errno_ptr, int (*atexit_ptr)(void (*func)(void))){
     return _install_allegro_version_check(system_id, errno_ptr, atexit_ptr, 0);
 }
@@ -911,7 +922,13 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     }
     
     check_blending();
-    
+
+    /* install shutdown handler */
+    if (_allegro_count == 0) {
+        if (atexit_ptr)
+            atexit_ptr(allegro_exit_stub);
+    }
+
     _allegro_count++;
 
     return 0;
