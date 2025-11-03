@@ -12,6 +12,8 @@
 
 #define VERSION_5_1_0 0x05010000
 
+ALLEGRO_DEBUG_CHANNEL("a425")
+
 typedef struct TIMER {
     ALLEGRO_TIMER *timer;
     void (*callback)();
@@ -1587,6 +1589,11 @@ void override_config_file(AL_CONST char *filename)
    set_config_file(filename);
 }
 
+void override_config_data(AL_CONST char *data, int length)
+{
+   ALLEGRO_WARN("Not implemented\n");
+}
+
 void set_config_file(char const *filename){
     if (current_config.allegro) al_destroy_config(current_config.allegro);
     current_config.allegro = al_load_config_file(filename);
@@ -1599,7 +1606,10 @@ void set_config_string(AL_CONST char *section, AL_CONST char *name, AL_CONST cha
 {
     if (!current_config.allegro)
         return;
-   al_set_config_value(current_config.allegro, section, name, val);
+   if (val)
+      al_set_config_value(current_config.allegro, section, name, val);
+   else
+      al_remove_config_key(current_config.allegro, section, name);
    if (current_config.name)
       al_save_config_file(current_config.name, current_config.allegro);
 }
@@ -1641,6 +1651,78 @@ int get_config_int(char const *section, char const *name, int def){
     char const *v = al_get_config_value(current_config.allegro, section, name);
     if (!v) return def;
     return (int)strtol(v, NULL, 10);
+}
+
+/* get_config_hex:
+ *  Reads a hexadecimal integer from the configuration file.
+ */
+int get_config_hex(AL_CONST char *section, AL_CONST char *name, int def)
+{
+    AL_CONST char *s = get_config_string(section, name, NULL);
+    char tmp[64];
+    long i;
+
+    if ((s) && (ugetc(s))) {
+        i = ustrtol(s, NULL, 16);
+        if ((i == 0x7FFFFFFF) && (ustricmp(s, uconvert_ascii("7FFFFFFF", tmp)) != 0))
+            i = -1;
+        return i;
+    }
+
+    return def;
+}
+
+/* add_unique_name
+ *  Helper to add a name to a list of names.
+ */
+static int add_unique_name(AL_CONST char ***names, int n, char const *name)
+{
+    int i;
+    /* FIXME: use better search algorithm */
+    for (i = 0; i < n; i++)
+        if (!ustrcmp((*names)[i], name))
+            return n;
+
+    *names = _al_sane_realloc((void *)*names, (n + 1) * sizeof * *names);
+    (*names)[n] = name;
+    return n + 1;
+}
+
+/* list_config_entires:
+ *  Returns the names of all config entries in a section. The names parameter is
+ *  a pointer to a strings array that will contain the config keys. If it points to
+ *  a NULL pointer, it will be allocated, or else re-allocated accordingly. The
+ *  return value tells how many valid string pointers it contains after the
+ *  function returns.
+ */
+int list_config_entries(AL_CONST char *section, AL_CONST char ***names)
+{
+    int n = 0;
+    ALLEGRO_CONFIG_SECTION *section_iterator = NULL;
+    const char *section_name = al_get_first_config_section(current_config.allegro, &section_iterator);
+    while (section_name) {
+        if (ustricmp(section_name, section) == 0) {
+            ALLEGRO_CONFIG_ENTRY *entry_iterator = NULL;
+            const char *key = al_get_first_config_entry(current_config.allegro, section_name, &entry_iterator);
+            while (key) {
+                n = add_unique_name(names, n, key);
+                key = al_get_next_config_entry(&entry_iterator);
+            }
+            break;
+        }
+        section_name = al_get_next_config_section(&section_iterator);
+    }
+    return n;
+}
+
+/* free_config_entries:
+ *  Frees the entries list returned by list_config_entires or
+ *  list_config_sections again.
+ */
+void free_config_entries(AL_CONST char ***names)
+{
+    al_free(*names);
+    *names = NULL;
 }
 
 unsigned int _default_ds(){
@@ -1780,6 +1862,21 @@ void set_config_int(AL_CONST char *section, AL_CONST char *name, int val){
    char sval[1024];
    snprintf(sval, sizeof sval, "%d", val);
    set_config_string(section, name, sval);
+}
+
+/* set_config_hex:
+ *  Writes a hexadecimal integer to the configuration file.
+ */
+void set_config_hex(AL_CONST char *section, AL_CONST char *name, int val)
+{
+    char buf[32], tmp[32];
+
+    if (val >= 0) {
+        uszprintf(buf, sizeof(buf), uconvert_ascii("%X", tmp), val);
+        set_config_string(section, name, buf);
+    }
+    else
+        set_config_string(section, name, uconvert_ascii("-1", buf));
 }
 
 int show_os_cursor(int cursor){
