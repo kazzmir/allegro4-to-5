@@ -23,30 +23,6 @@
    extern "C" {
 #endif
 
-AL_FUNC(int, makecol15, (int r, int g, int b));
-AL_FUNC(int, makecol16, (int r, int g, int b));
-AL_FUNC(int, makecol24, (int r, int g, int b));
-AL_FUNC(int, makecol32, (int r, int g, int b));
-AL_FUNC(int, makeacol32, (int r, int g, int b, int a));
-
-AL_FUNC(int, getr8, (int c));
-AL_FUNC(int, getg8, (int c));
-AL_FUNC(int, getb8, (int c));
-AL_FUNC(int, getr15, (int c));
-AL_FUNC(int, getg15, (int c));
-AL_FUNC(int, getb15, (int c));
-AL_FUNC(int, getr16, (int c));
-AL_FUNC(int, getg16, (int c));
-AL_FUNC(int, getb16, (int c));
-AL_FUNC(int, getr24, (int c));
-AL_FUNC(int, getg24, (int c));
-AL_FUNC(int, getb24, (int c));
-AL_FUNC(int, getr32, (int c));
-AL_FUNC(int, getg32, (int c));
-AL_FUNC(int, getb32, (int c));
-AL_FUNC(int, geta32, (int c));
-
-       /*
 AL_INLINE(int, makecol15, (int r, int g, int b),
 {
    return (((r >> 3) << _rgb_r_shift_15) |
@@ -192,7 +168,6 @@ AL_INLINE(void, _set_color, (int idx, AL_CONST RGB *p),
 })
 
 #endif
-*/
 
 
 #ifdef __cplusplus

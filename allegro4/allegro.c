@@ -153,7 +153,7 @@ static ALLEGRO_COLOR a5color(int a4color, int bit_depth){
             ((a4color >> 11) & 31) * 255 / 31);
     }
     if (bit_depth == 32){
-        return al_map_rgb(a4color & 255, (a4color >> 8) & 255, (a4color >> 16) & 255);
+        return al_map_rgb(getr32(a4color), getg32(a4color), getb32(a4color));
     }
     /* FIXME: handle other depths */
     return al_map_rgb(1, 1, 1);
@@ -592,6 +592,20 @@ int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualh
             display = NULL;
         }
         al_register_event_source(system_event_queue, al_get_display_event_source(display));
+
+#ifdef ALLEGRO_WINDOWS
+        ALLEGRO_PIXEL_FORMAT pf = al_get_display_format(display);
+        switch (pf) {
+        case ALLEGRO_PIXEL_FORMAT_ARGB_8888:
+           _rgb_r_shift_32 = 16;
+           _rgb_g_shift_32 = 8;
+           _rgb_b_shift_32 = 0;
+           _rgb_a_shift_32 = 24;
+           break;
+        default:
+           break;
+        }
+#endif
         return 0;
     }
     return -1;
@@ -1336,18 +1350,6 @@ void textout_right(struct BITMAP *bmp, FONT *f, AL_CONST char *str, int x, int y
 void draw_gouraud_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y, int c1, int c2, int c3, int c4){
     draw_into(bmp);
     al_draw_bitmap(sprite->real, x, y, 0);
-}
-
-int makecol_depth(int depth, int r, int g, int b){
-    switch (depth){
-        case 8: return bestfit_color(current_palette, r>>2, g>>2, b>>2);
-        case 15: return (r >> 3) + ((g >> 3) << 5) + ((b >> 3) << 10);
-        case 16: return (r >> 3) + ((g >> 2) << 5) + ((b >> 3) << 11);
-        case 24: return r + (g << 8) + (b << 16);
-        case 32: return r + (g << 8) + (b << 16) + (255 << 24);
-        /* FIXME: handle 15, 16, 24, 32 */
-        default: return 0;
-    }
 }
 
 void set_clip_rect(BITMAP * bitmap, int x1, int y1, int x2, int y2){
