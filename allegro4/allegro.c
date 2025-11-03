@@ -1586,7 +1586,10 @@ void set_config_string(AL_CONST char *section, AL_CONST char *name, AL_CONST cha
 {
     if (!current_config.allegro)
         return;
-   al_set_config_value(current_config.allegro, section, name, val);
+   if (val)
+      al_set_config_value(current_config.allegro, section, name, val);
+   else
+      al_remove_config_key(current_config.allegro, section, name);
    if (current_config.name)
       al_save_config_file(current_config.name, current_config.allegro);
 }
