@@ -153,7 +153,9 @@ static ALLEGRO_COLOR a5color(int a4color, int bit_depth){
             ((a4color >> 11) & 31) * 255 / 31);
     }
     if (bit_depth == 32){
-        return al_map_rgb(getr32(a4color), getg32(a4color), getb32(a4color));
+        return a4color != MASK_COLOR_32 ?
+            al_map_rgb(getr32(a4color), getg32(a4color), getb32(a4color)) :
+            (ALLEGRO_COLOR) { 0 };
     }
     /* FIXME: handle other depths */
     return al_map_rgb(1, 1, 1);
@@ -200,6 +202,15 @@ int getb(int color){
 }
 
 int bitmap_mask_color(BITMAP *b){
+    switch (current_depth) {
+    case  8: return MASK_COLOR_8;  break;
+    case 15: return MASK_COLOR_15; break;
+    case 16: return MASK_COLOR_16; break;
+    case 24: return MASK_COLOR_24; break;
+    case 32: return MASK_COLOR_32; break;
+    default:
+        ALLEGRO_ERROR("Unsupported current_depth depth %d\n", current_depth);
+    }
     return 0;
 }
 
@@ -1384,7 +1395,15 @@ int makecol(int r, int g, int b){
 
 void clear_to_color(BITMAP *bitmap, int color){
     draw_into(bitmap);
-    al_clear_to_color(a5color(color, current_depth));
+    /* Color 0 (MASK_COLOR_8) is special in 8-bit mode. It is used with custom pointer in exmouse.
+     * We cannot move this logic to a5color as palette[0] is valid and is usually black.
+     * E.g. see exstars/erase_ship().
+     * For 32-bit mode, it is expected to do that in a5color.
+     * The Allegro GUI Un-uglification Project (AGUP) uses putpixel with MASK_COLOR_32. */
+    if (color || current_depth != 8)
+        al_clear_to_color(a5color(color, current_depth));
+    else
+        al_clear_to_color((ALLEGRO_COLOR) { 0 });
 }
 
 void acquire_screen(){
