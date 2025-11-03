@@ -1563,6 +1563,8 @@ static PACKFILE *create_packfile(int is_normal_packfile)
       f->normal.todo = 0;
    }
 
+   f->ungetc_len = 0;
+
    return f;
 }
 
@@ -1883,7 +1885,7 @@ int pack_fclose(PACKFILE *f)
    ASSERT(f->vtable);
    ASSERT(f->vtable->pf_fclose);
 
-   ret = f->vtable->pf_fclose(f->userdata);
+   ret = f->vtable->fi_fclose(f->userdata);
    if (ret != 0)
       *allegro_errno = errno;
 
@@ -2119,81 +2121,6 @@ PACKFILE *pack_fclose_chunk(PACKFILE *f)
 }
 
 
-
-/* pack_fseek:
- *  Like the stdio fseek() function, but only supports forward seeks 
- *  relative to the current file position.
- */
-int pack_fseek(PACKFILE *f, int offset)
-{
-   ASSERT(f);
-   ASSERT(offset >= 0);
-
-   return f->vtable->pf_fseek(f->userdata, offset);
-}
-
-
-
-/* pack_getc:
- *  Returns the next character from the stream f, or EOF if the end of the
- *  file has been reached.
- */
-int pack_getc(PACKFILE *f)
-{
-   ASSERT(f);
-   ASSERT(f->vtable);
-   ASSERT(f->vtable->pf_getc);
-
-   return f->vtable->pf_getc(f->userdata);
-}
-
-
-
-/* pack_putc:
- *  Puts a character in the stream f.
- */
-int pack_putc(int c, PACKFILE *f)
-{
-   ASSERT(f);
-   ASSERT(f->vtable);
-   ASSERT(f->vtable->pf_putc);
-
-   return f->vtable->pf_putc(c, f->userdata);
-}
-
-
-
-/* pack_feof:
- *  pack_feof() returns nonzero as soon as you reach the end of the file. It 
- *  does not wait for you to attempt to read beyond the end of the file,
- *  contrary to the ISO C feof() function.
- */
-int pack_feof(PACKFILE *f)
-{
-   ASSERT(f);
-   ASSERT(f->vtable);
-   ASSERT(f->vtable->pf_feof);
-
-   return f->vtable->pf_feof(f->userdata);
-}
-
-
-
-/* pack_ferror:
- *  Returns nonzero if the error indicator for the stream is set, indicating
- *  that an error has occurred during a previous operation on the stream.
- */
-int pack_ferror(PACKFILE *f)
-{
-   ASSERT(f);
-   ASSERT(f->vtable);
-   ASSERT(f->vtable->pf_ferror);
-
-   return f->vtable->pf_ferror(f->userdata);
-}
-
-
-
 /* pack_igetw:
  *  Reads a 16 bit word from a file, using intel byte ordering.
  */
@@ -2355,59 +2282,6 @@ long pack_mputl(long l, PACKFILE *f)
 }
 
 
-
-/* pack_fread:
- *  Reads n bytes from f and stores them at memory location p. Returns the 
- *  number of items read, which will be less than n if EOF is reached or an 
- *  error occurs. Error codes are stored in errno.
- */
-long pack_fread(void *p, long n, PACKFILE *f)
-{
-   ASSERT(f);
-   ASSERT(f->vtable);
-   ASSERT(f->vtable->pf_fread);
-   ASSERT(p);
-   ASSERT(n >= 0);
-
-   return f->vtable->pf_fread(p, n, f->userdata);
-}
-
-
-
-/* pack_fwrite:
- *  Writes n bytes to the file f from memory location p. Returns the number 
- *  of items written, which will be less than n if an error occurs. Error 
- *  codes are stored in errno.
- */
-long pack_fwrite(AL_CONST void *p, long n, PACKFILE *f)
-{
-   ASSERT(f);
-   ASSERT(f->vtable);
-   ASSERT(f->vtable->pf_fwrite);
-   ASSERT(p);
-   ASSERT(n >= 0);
-
-   return f->vtable->pf_fwrite(p, n, f->userdata);
-}
-
-
-
-/* pack_ungetc:
- *  Puts a character back in the file's input buffer. It only works
- *  for characters just fetched by pack_getc and, like ungetc, only a
- *  single push back is guaranteed.
- */
-int pack_ungetc(int c, PACKFILE *f)
-{
-   ASSERT(f);
-   ASSERT(f->vtable);
-   ASSERT(f->vtable->pf_ungetc);
-
-   return f->vtable->pf_ungetc(c, f->userdata);
-}
-
-
-
 /* pack_fgets:
  *  Reads a line from a text file, storing it at location p. Stops when a
  *  linefeed is encountered, or max bytes have been read. Returns a pointer
@@ -2535,15 +2409,16 @@ void *pack_get_userdata(PACKFILE *f)
 */
 
 
-static int normal_fclose(void *_f);
-static int normal_getc(void *_f);
-static int normal_ungetc(int ch, void *_f);
-static int normal_putc(int c, void *_f);
-static long normal_fread(void *p, long n, void *_f);
-static long normal_fwrite(AL_CONST void *p, long n, void *_f);
-static int normal_fseek(void *_f, int offset);
-static int normal_feof(void *_f);
-static int normal_ferror(void *_f);
+static bool normal_fclose(PACKFILE *f);
+static int normal_getc(PACKFILE *f);
+static int normal_ungetc(PACKFILE *f, int ch);
+static int normal_putc(int c, PACKFILE *f);
+static size_t normal_fread(PACKFILE *f, void *p, size_t n);
+static size_t normal_fwrite(PACKFILE *f, AL_CONST void *p, size_t n);
+static int64_t normal_ftell(PACKFILE *f);
+static bool normal_fseek(PACKFILE *f, int64_t offset, int _whence);
+static bool normal_feof(PACKFILE *f);
+static int normal_ferror(PACKFILE *f);
 
 static int normal_refill_buffer(PACKFILE *f);
 static int normal_flush_buffer(PACKFILE *f, int last);
@@ -2552,27 +2427,32 @@ static int normal_flush_buffer(PACKFILE *f, int last);
 
 static PACKFILE_VTABLE normal_vtable =
 {
+   NULL, /* fi_fopen */
    normal_fclose,
-   normal_getc,
-   normal_ungetc,
    normal_fread,
-   normal_putc,
    normal_fwrite,
+   NULL, /* fi_fflush */
+   normal_ftell, /* fi_ftell */
    normal_fseek,
    normal_feof,
-   normal_ferror
+   normal_ferror,
+   NULL, /* fi_ferrmsg */
+   NULL, /* fi_fclearerr */
+   normal_ungetc,
+   NULL /* fi_fsize */
+   //normal_getc,
+   //normal_putc,
 };
 
 
 
-static int normal_fclose(void *_f)
+static bool normal_fclose(PACKFILE *f)
 {
-   PACKFILE *f = _f;
-   int ret;
+   bool ret;
 
    if (f->normal.flags & PACKFILE_FLAG_WRITE) {
       if (f->normal.flags & PACKFILE_FLAG_CHUNK) {
-         f = pack_fclose_chunk(_f);
+         f = pack_fclose_chunk(f);
          if (!f)
             return -1;
 
@@ -2634,10 +2514,8 @@ static INLINE int normal_no_more_input(PACKFILE *f)
 
 
 
-static int normal_getc(void *_f)
+static int normal_getc(PACKFILE *f)
 {
-   PACKFILE *f = _f;
-
    f->normal.buf_size--;
    if (f->normal.buf_size > 0)
       return *(f->normal.buf_pos++);
@@ -2653,10 +2531,8 @@ static int normal_getc(void *_f)
 
 
 
-static int normal_ungetc(int c, void *_f)
+static int normal_ungetc(PACKFILE *f, int c)
 {
-   PACKFILE *f = _f;
-
    if (f->normal.buf_pos == f->normal.buf) {
       return EOF;
    }
@@ -2670,9 +2546,8 @@ static int normal_ungetc(int c, void *_f)
 
 
 
-static long normal_fread(void *p, long n, void *_f)
+static size_t normal_fread(PACKFILE *f, void *p, size_t n)
 {
-   PACKFILE *f = _f;
    unsigned char *cp = (unsigned char *)p;
    long i;
    int c;
@@ -2689,10 +2564,8 @@ static long normal_fread(void *p, long n, void *_f)
 
 
 
-static int normal_putc(int c, void *_f)
+static int normal_putc(int c, PACKFILE *f)
 {
-   PACKFILE *f = _f;
-
    if (f->normal.buf_size + 1 >= F_BUF_SIZE) {
       if (normal_flush_buffer(f, FALSE))
          return EOF;
@@ -2704,9 +2577,8 @@ static int normal_putc(int c, void *_f)
 
 
 
-static long normal_fwrite(AL_CONST void *p, long n, void *_f)
+static size_t normal_fwrite(PACKFILE *f, AL_CONST void *p, size_t n)
 {
-   PACKFILE *f = _f;
    AL_CONST unsigned char *cp = (AL_CONST unsigned char *)p;
    long i;
 
@@ -2718,11 +2590,19 @@ static long normal_fwrite(AL_CONST void *p, long n, void *_f)
    return i;
 }
 
-
-
-static int normal_fseek(void *_f, int offset)
+/* used at least by wav & bmp loaders in a5 */
+static int64_t normal_ftell(PACKFILE *f)
 {
-   PACKFILE *f = _f;
+   ASSERT(f);
+   ASSERT(f->is_normal_packfile);
+   return lseek(f->normal.flags & PACKFILE_FLAG_PACK ?
+      f->normal.parent->normal.hndl : f->normal.hndl, 0, SEEK_CUR) +
+      (f->normal.buf_pos - f->normal.buf);
+}
+
+static bool normal_fseek(PACKFILE *f, int64_t offset, int _whence)
+{
+   ASSERT(_whence == ALLEGRO_SEEK_CUR);
    int i;
 
    if (f->normal.flags & PACKFILE_FLAG_WRITE)
@@ -2774,19 +2654,15 @@ static int normal_fseek(void *_f, int offset)
 
 
 
-static int normal_feof(void *_f)
+static bool normal_feof(PACKFILE *f)
 {
-   PACKFILE *f = _f;
-
    return (f->normal.flags & PACKFILE_FLAG_EOF);
 }
 
 
 
-static int normal_ferror(void *_f)
+static int normal_ferror(PACKFILE *f)
 {
-   PACKFILE *f = _f;
-
    return (f->normal.flags & PACKFILE_FLAG_ERROR);
 }
 

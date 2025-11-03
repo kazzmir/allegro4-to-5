@@ -11,4 +11,6 @@ if (shared):
 else:
 	library = env.StaticLibrary(name, source)
 
+Alias('library', library)
+
 Return('name')

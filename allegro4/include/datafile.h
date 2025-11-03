@@ -89,10 +89,14 @@ AL_FUNC(void, register_datafile_object, (int id_, AL_METHOD(void *, load, (struc
 AL_FUNC(void, fixup_datafile, (DATAFILE *data));
 
 AL_FUNC(struct BITMAP *, load_bitmap, (AL_CONST char *filename, struct RGB *pal));
-AL_FUNC(struct BITMAP *, load_bmp, (AL_CONST char *filename, struct RGB *pal));
+AL_INLINE(struct BITMAP *, load_bmp, (AL_CONST char *filename, struct RGB *pal),{
+   return load_bitmap(filename, pal);
+});
 AL_FUNC(struct BITMAP *, load_bmp_pf, (PACKFILE *f, struct RGB *pal));
 AL_FUNC(struct BITMAP *, load_lbm, (AL_CONST char *filename, struct RGB *pal));
-AL_FUNC(struct BITMAP *, load_pcx, (AL_CONST char *filename, struct RGB *pal));
+AL_INLINE(struct BITMAP *, load_pcx, (AL_CONST char *filename, struct RGB *pal), {
+   return load_bitmap(filename, pal);
+});
 AL_FUNC(struct BITMAP *, load_pcx_pf, (PACKFILE *f, struct RGB *pal));
 AL_FUNC(struct BITMAP *, load_tga, (AL_CONST char *filename, struct RGB *pal));
 AL_FUNC(struct BITMAP *, load_tga_pf, (PACKFILE *f, struct RGB *pal));
@@ -100,7 +104,9 @@ AL_FUNC(struct BITMAP *, load_tga_pf, (PACKFILE *f, struct RGB *pal));
 AL_FUNC(int, save_bitmap, (AL_CONST char *filename, struct BITMAP *bmp, AL_CONST struct RGB *pal));
 AL_FUNC(int, save_bmp, (AL_CONST char *filename, struct BITMAP *bmp, AL_CONST struct RGB *pal));
 AL_FUNC(int, save_bmp_pf, (PACKFILE *f, struct BITMAP *bmp, AL_CONST struct RGB *pal));
-AL_FUNC(int, save_pcx, (AL_CONST char *filename, struct BITMAP *bmp, AL_CONST struct RGB *pal));
+AL_INLINE(int, save_pcx, (AL_CONST char *filename, struct BITMAP *bmp, AL_CONST struct RGB *pal),{
+   return save_bitmap(filename, bmp, pal);
+})
 AL_FUNC(int, save_pcx_pf, (PACKFILE *f, struct BITMAP *bmp, AL_CONST struct RGB *pal));
 AL_FUNC(int, save_tga, (AL_CONST char *filename, struct BITMAP *bmp, AL_CONST struct RGB *pal));
 AL_FUNC(int, save_tga_pf, (PACKFILE *f, struct BITMAP *bmp, AL_CONST struct RGB *pal));

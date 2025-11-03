@@ -87,8 +87,8 @@ AL_FUNC(void, al_findclose, (struct al_ffblk *info));
 #define FA_NONE 0
 #define FA_ALL (~FA_NONE)
 
-typedef struct PACKFILE_VTABLE PACKFILE_VTABLE;
-typedef struct PACKFILE PACKFILE;
+#define PACKFILE ALLEGRO_FILE
+#define PACKFILE_VTABLE ALLEGRO_FILE_INTERFACE
 
 struct LZSS_PACK_DATA;
 struct LZSS_UNPACK_DATA;
@@ -110,33 +110,22 @@ struct _al_normal_packfile_details
    unsigned char buf[F_BUF_SIZE];      /* the actual data buffer */
 };
 
+/* Keep this in sync with allegro5/internal/aintern_file.h */
+#define ALLEGRO_UNGETC_SIZE 16
 
 struct PACKFILE                           /* our very own FILE structure... */
 {
    AL_CONST PACKFILE_VTABLE *vtable;
    void *userdata;
-   int is_normal_packfile;
+   unsigned char ungetc[ALLEGRO_UNGETC_SIZE];
+   int ungetc_len;
 
    /* The following is only to be used for the "normal" PACKFILE vtable,
-    * i.e. what is implemented by Allegro itself. If is_normal_packfile is
-    * false then the following is not even allocated. This must be the last
-    * member in the structure.
+    * i.e. what is implemented by Allegro 4. In Allegro 5 this is not used.
+    * This must be the last members in the structure.
     */
+   int is_normal_packfile;
    struct _al_normal_packfile_details normal;
-};
-
-
-struct PACKFILE_VTABLE
-{
-   AL_METHOD(int, pf_fclose, (void *userdata));
-   AL_METHOD(int, pf_getc, (void *userdata));
-   AL_METHOD(int, pf_ungetc, (int c, void *userdata));
-   AL_METHOD(long, pf_fread, (void *p, long n, void *userdata));
-   AL_METHOD(int, pf_putc, (int c, void *userdata));
-   AL_METHOD(long, pf_fwrite, (AL_CONST void *p, long n, void *userdata));
-   AL_METHOD(int, pf_fseek, (void *userdata, int offset));
-   AL_METHOD(int, pf_feof, (void *userdata));
-   AL_METHOD(int, pf_ferror, (void *userdata));
 };
 
 
@@ -149,13 +138,23 @@ AL_FUNC(void, packfile_password, (AL_CONST char *password));
 AL_FUNC(PACKFILE *, pack_fopen, (AL_CONST char *filename, AL_CONST char *mode));
 AL_FUNC(PACKFILE *, pack_fopen_vtable, (AL_CONST PACKFILE_VTABLE *vtable, void *userdata));
 AL_FUNC(int, pack_fclose, (PACKFILE *f));
-AL_FUNC(int, pack_fseek, (PACKFILE *f, int offset));
+AL_INLINE(int, pack_fseek, (PACKFILE *f, int offset), {
+   return al_fseek(f, offset, ALLEGRO_SEEK_CUR);
+});
 AL_FUNC(PACKFILE *, pack_fopen_chunk, (PACKFILE *f, int pack));
 AL_FUNC(PACKFILE *, pack_fclose_chunk, (PACKFILE *f));
-AL_FUNC(int, pack_getc, (PACKFILE *f));
-AL_FUNC(int, pack_putc, (int c, PACKFILE *f));
-AL_FUNC(int, pack_feof, (PACKFILE *f));
-AL_FUNC(int, pack_ferror, (PACKFILE *f));
+AL_INLINE(int, pack_getc, (PACKFILE *f), {
+   return al_fgetc(f);
+});
+AL_INLINE(int, pack_putc, (int c, PACKFILE *f), {
+   return al_fputc(f, c);
+});
+AL_INLINE(int, pack_feof, (PACKFILE *f), {
+   return al_feof(f);
+});
+AL_INLINE(int, pack_ferror, (PACKFILE *f), {
+   return al_ferror(f);
+});
 AL_FUNC(int, pack_igetw, (PACKFILE *f));
 AL_FUNC(long, pack_igetl, (PACKFILE *f));
 AL_FUNC(int, pack_iputw, (int w, PACKFILE *f));
@@ -164,9 +163,15 @@ AL_FUNC(int, pack_mgetw, (PACKFILE *f));
 AL_FUNC(long, pack_mgetl, (PACKFILE *f));
 AL_FUNC(int, pack_mputw, (int w, PACKFILE *f));
 AL_FUNC(long, pack_mputl, (long l, PACKFILE *f));
-AL_FUNC(long, pack_fread, (void *p, long n, PACKFILE *f));
-AL_FUNC(long, pack_fwrite, (AL_CONST void *p, long n, PACKFILE *f));
-AL_FUNC(int, pack_ungetc, (int c, PACKFILE *f));
+AL_INLINE(long, pack_fread, (void *p, long n, PACKFILE *f), {
+    return (long)al_fread(f, p, n);
+});
+AL_INLINE(long, pack_fwrite, (AL_CONST void *p, long n, PACKFILE *f), {
+   return (long)al_fwrite(f, p, n);
+});
+AL_INLINE(int, pack_ungetc, (int c, PACKFILE *f), {
+   return al_fungetc(f, c);
+});
 AL_FUNC(char *, pack_fgets, (char *p, int max, PACKFILE *f));
 AL_FUNC(int, pack_fputs, (AL_CONST char *p, PACKFILE *f));
 AL_FUNC(void *, pack_get_userdata, (PACKFILE *f));

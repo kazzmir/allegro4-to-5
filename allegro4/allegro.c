@@ -82,6 +82,7 @@ static struct CONFIG *config_stack;
 static int config_stack_size;
 int _gfx_mode_set_count;
 int _allegro_count;
+int _allegro_in_exit = FALSE;
 static int color_conversion;
 void (*close_button_callback)(void);
 
@@ -511,22 +512,25 @@ static BITMAP * create_bitmap_from(ALLEGRO_BITMAP * real){
 
 BITMAP * load_bitmap(const char * path, struct RGB *pal){
     ALLEGRO_BITMAP *bmp;
+    PACKFILE *f = pack_fopen(path, F_READ);
+    if (!f)
+        return NULL;
+    const char *ident = strrchr(path, '.');
 #if ALLEGRO_VERSION_INT >= VERSION_5_1_0
-    bmp = al_load_bitmap_flags(path, ALLEGRO_NO_PREMULTIPLIED_ALPHA);
+    bmp = al_load_bitmap_flags_f(f, ident, ALLEGRO_NO_PREMULTIPLIED_ALPHA);
 #else
     int old_flags = al_get_new_bitmap_flags();
     al_set_new_bitmap_flags(old_flags | ALLEGRO_NO_PREMULTIPLIED_ALPHA);
-    bmp = al_load_bitmap(path);
+    bmp = al_load_bitmap_f(f, ident);
     al_set_new_bitmap_flags(old_flags);
 #endif
-    if (bmp)
-	return create_bitmap_from(bmp);
+    pack_fclose(f);
+    if (bmp) {
+        al_convert_mask_to_alpha(bmp, al_map_rgb(255, 0, 255));
+        return create_bitmap_from(bmp);
+    }
     else
 	return NULL;
-}
-
-struct BITMAP * load_bmp(AL_CONST char *filename, struct RGB *pal){
-    return load_bitmap(filename, pal);
 }
 
 void destroy_bitmap(BITMAP* bitmap){
@@ -883,6 +887,16 @@ static void call_constructors(void) {
    #endif
 }
 
+/* allegro_exit_stub:
+ *  Stub function registered by the library via atexit.
+ */
+static void allegro_exit_stub(void)
+{
+    _allegro_in_exit = TRUE;
+
+    allegro_exit();
+}
+
 int install_allegro(int system_id, int *errno_ptr, int (*atexit_ptr)(void (*func)(void))){
     return _install_allegro_version_check(system_id, errno_ptr, atexit_ptr, 0);
 }
@@ -908,7 +922,13 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     }
     
     check_blending();
-    
+
+    /* install shutdown handler */
+    if (_allegro_count == 0) {
+        if (atexit_ptr)
+            atexit_ptr(allegro_exit_stub);
+    }
+
     _allegro_count++;
 
     return 0;
