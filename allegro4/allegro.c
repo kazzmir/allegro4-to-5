@@ -130,6 +130,10 @@ int _rgb_scale_6[64] =
    227, 231, 235, 239, 243, 247, 251, 255
 };
 
+#ifdef __AVX__
+/* RGB byte order shifts */
+static __m128i rgb_shifts;
+#endif
 
 /* forward declarations */
 static void lazily_create_real_bitmap(BITMAP *bitmap, int is_mono_font);
@@ -156,9 +160,21 @@ static ALLEGRO_COLOR a5color(int a4color, int bit_depth){
             ((a4color >> 11) & 31) * 255 / 31);
     }
     if (bit_depth == 32){
+#ifdef __AVX__
+        if (a4color == MASK_COLOR_32)
+            return (ALLEGRO_COLOR) { 0 };
+        ALLEGRO_COLOR ret;
+        a4color |= 0xFF000000;
+        __m128i c_ivec = _mm_shuffle_epi8(_mm_loadu_si32(&a4color), rgb_shifts);
+        __m128 c_fvec = _mm_cvtepi32_ps(_mm_cvtepu8_epi32(c_ivec));
+        __m128 c_norm = _mm_mul_ps(c_fvec, _mm_set1_ps(1.0/255.0f));
+        _mm_storeu_ps((float*) &ret, c_norm);
+        return ret;
+#else
         return a4color != MASK_COLOR_32 ?
             al_map_rgb(getr32(a4color), getg32(a4color), getb32(a4color)) :
             (ALLEGRO_COLOR) { 0 };
+#endif
     }
     /* FIXME: handle other depths */
     return al_map_rgb(1, 1, 1);
@@ -611,14 +627,24 @@ int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualh
         ALLEGRO_PIXEL_FORMAT pf = al_get_display_format(display);
         switch (pf) {
         case ALLEGRO_PIXEL_FORMAT_ARGB_8888:
+    #ifdef __AVX__
+           rgb_shifts = _mm_setr_epi8(2, 1, 0, 3, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
+    #endif
            _rgb_r_shift_32 = 16;
            _rgb_g_shift_32 = 8;
            _rgb_b_shift_32 = 0;
            _rgb_a_shift_32 = 24;
            break;
         default:
+    #ifdef __AVX__
+           rgb_shifts = _mm_setr_epi8(0, 1, 2, 3, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
+    #endif
            break;
         }
+#else
+    #ifdef __AVX__
+        rgb_shifts = _mm_setr_epi8(0, 1, 2, 3, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
+    #endif
 #endif
         return 0;
     }
