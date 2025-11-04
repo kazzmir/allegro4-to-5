@@ -9,6 +9,9 @@
 #include <allegro5/allegro_audio.h>
 
 #include "include/internal/aintern.h"
+#ifdef __AVX__
+#include <immintrin.h>
+#endif
 
 #define VERSION_5_1_0 0x05010000
 
@@ -1499,6 +1502,30 @@ void persp_project_f(float x, float y, float z, float *xout, float *yout){
    float z1 = 1.0f / z;
    *xout = ((x * z1) * _persp_xscale_f) + _persp_xoffset_f;
    *yout = ((y * z1) * _persp_yscale_f) + _persp_yoffset_f;
+}
+
+void polygon(BITMAP *bmp, int vertices, AL_CONST int *points, int color) {
+    int limit = vertices << 1;
+    float *pts = al_malloc(limit * sizeof(float));
+    int i = 0;
+#ifdef __AVX__
+	/* process 4 vertices at a time but make sure we stay within array bounds */
+    limit -= 6;
+    for (; i < limit; i += 8) {
+        __m256i int_vec = _mm256_loadu_si256((const __m256i *)(points + i));
+        __m256 float_vec = _mm256_cvtepi32_ps(int_vec);
+        _mm256_storeu_ps(pts + i, float_vec);
+    }
+    /* then process the rest */
+    limit += 6;
+#endif
+	for (; i < limit; i++) {
+		pts[i] = points[i];
+	}
+	draw_into(bmp);
+    /* We don't check polygon orientation here. It is important in A5! */
+	al_draw_filled_polygon(pts, vertices, a5color(color, current_depth));
+    al_free(pts);
 }
 
 void polygon3d_f(BITMAP * bitmap, int type, BITMAP * texture, int vc, V3D_f * vtx[]){
