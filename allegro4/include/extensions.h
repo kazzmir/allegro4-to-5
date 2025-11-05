@@ -15,6 +15,7 @@ typedef enum
 
 void convert_8bit(BITMAP *bitmap, CONVERT_8BIT mode, ALLEGRO_COLOR c);
 
+AL_FUNC(ALLEGRO_COLOR, a5color, (int a4color, int bit_depth));
 void hold_screen_refresh(int hold);
 
 /* Non-a4 extras to use with native dialogs etc*/

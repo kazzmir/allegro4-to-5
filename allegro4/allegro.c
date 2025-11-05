@@ -148,7 +148,7 @@ static int is_ok(int code){
 }
 
 /* returns an A5 color (ALLEGRO_COLOR) given an A4 packed int */
-static ALLEGRO_COLOR a5color(int a4color, int bit_depth){
+ALLEGRO_COLOR a5color(int a4color, int bit_depth){
     if (bit_depth == 8){
         RGB * rgb = &current_palette[a4color];
         return al_map_rgb(rgb->r * 4, rgb->g * 4, rgb->b * 4);
