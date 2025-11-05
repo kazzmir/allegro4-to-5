@@ -187,6 +187,10 @@ static int a4color(ALLEGRO_COLOR color, int bit_depth){
     return makecol_depth(bit_depth, red, green, blue);
 }
 
+ALLEGRO_DISPLAY* all_get_display(void){
+    return display;
+}
+
 int getr_depth(int color_depth, int c){
     ALLEGRO_COLOR color = a5color(c, color_depth);
     unsigned char red, green, blue;

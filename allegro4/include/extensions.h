@@ -17,6 +17,11 @@ void convert_8bit(BITMAP *bitmap, CONVERT_8BIT mode, ALLEGRO_COLOR c);
 
 void hold_screen_refresh(int hold);
 
+/* Non-a4 extras to use with native dialogs etc*/
+AL_VAR(ALLEGRO_DISPLAY *, display);
+/* Allegro Legacy compatibility */
+AL_FUNC(ALLEGRO_DISPLAY *, all_get_display, (void));
+
 #ifdef __cplusplus
    }
 #endif
