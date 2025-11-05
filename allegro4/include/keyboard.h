@@ -61,8 +61,10 @@ AL_VAR(int, key_led_flag);
 AL_FUNC(int, keypressed, (void));
 AL_FUNC(int, readkey, (void));
 AL_FUNC(int, ureadkey, (int *scancode));
-AL_FUNC(void, simulate_keypress, (int keycode));
 AL_FUNC(void, simulate_ukeypress, (int keycode, int scancode));
+AL_INLINE(void, simulate_keypress, (int keycode), {
+   simulate_ukeypress(keycode & 255, keycode >> 8);
+});
 AL_FUNC(void, clear_keybuf, (void));
 AL_FUNC(void, set_leds, (int leds));
 AL_FUNC(void, set_keyboard_rate, (int delay, int repeat));

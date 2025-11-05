@@ -9,6 +9,9 @@
 #include <allegro5/allegro_audio.h>
 
 #include "include/internal/aintern.h"
+#ifdef __AVX__
+#include <immintrin.h>
+#endif
 
 #define VERSION_5_1_0 0x05010000
 
@@ -127,6 +130,10 @@ int _rgb_scale_6[64] =
    227, 231, 235, 239, 243, 247, 251, 255
 };
 
+#ifdef __AVX__
+/* RGB byte order shifts */
+static __m128i rgb_shifts;
+#endif
 
 /* forward declarations */
 static void lazily_create_real_bitmap(BITMAP *bitmap, int is_mono_font);
@@ -153,7 +160,21 @@ static ALLEGRO_COLOR a5color(int a4color, int bit_depth){
             ((a4color >> 11) & 31) * 255 / 31);
     }
     if (bit_depth == 32){
-        return al_map_rgb(a4color & 255, (a4color >> 8) & 255, (a4color >> 16) & 255);
+#ifdef __AVX__
+        if (a4color == MASK_COLOR_32)
+            return (ALLEGRO_COLOR) { 0 };
+        ALLEGRO_COLOR ret;
+        a4color |= 0xFF000000;
+        __m128i c_ivec = _mm_shuffle_epi8(_mm_loadu_si32(&a4color), rgb_shifts);
+        __m128 c_fvec = _mm_cvtepi32_ps(_mm_cvtepu8_epi32(c_ivec));
+        __m128 c_norm = _mm_mul_ps(c_fvec, _mm_set1_ps(1.0/255.0f));
+        _mm_storeu_ps((float*) &ret, c_norm);
+        return ret;
+#else
+        return a4color != MASK_COLOR_32 ?
+            al_map_rgb(getr32(a4color), getg32(a4color), getb32(a4color)) :
+            (ALLEGRO_COLOR) { 0 };
+#endif
     }
     /* FIXME: handle other depths */
     return al_map_rgb(1, 1, 1);
@@ -200,6 +221,15 @@ int getb(int color){
 }
 
 int bitmap_mask_color(BITMAP *b){
+    switch (current_depth) {
+    case  8: return MASK_COLOR_8;  break;
+    case 15: return MASK_COLOR_15; break;
+    case 16: return MASK_COLOR_16; break;
+    case 24: return MASK_COLOR_24; break;
+    case 32: return MASK_COLOR_32; break;
+    default:
+        ALLEGRO_ERROR("Unsupported current_depth depth %d\n", current_depth);
+    }
     return 0;
 }
 
@@ -290,11 +320,11 @@ void clear_keybuf(){
     al_unlock_mutex(keybuffer_mutex);
 }
 
-void simulate_keypress(int k){
+void simulate_ukeypress(int k, int scancode) {
     al_lock_mutex(keybuffer_mutex);
     if (keybuffer_pos < KEYBUFFER_LENGTH) {
-        keybuffer[keybuffer_pos].unicode = k & 255;
-        keybuffer[keybuffer_pos].keycode = k >> 8;
+        keybuffer[keybuffer_pos].unicode = k;
+        keybuffer[keybuffer_pos].keycode = scancode;
         keybuffer[keybuffer_pos].modifiers = 0;
         keybuffer_pos++;
     }
@@ -592,6 +622,30 @@ int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualh
             display = NULL;
         }
         al_register_event_source(system_event_queue, al_get_display_event_source(display));
+
+#ifdef ALLEGRO_WINDOWS
+        ALLEGRO_PIXEL_FORMAT pf = al_get_display_format(display);
+        switch (pf) {
+        case ALLEGRO_PIXEL_FORMAT_ARGB_8888:
+    #ifdef __AVX__
+           rgb_shifts = _mm_setr_epi8(2, 1, 0, 3, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
+    #endif
+           _rgb_r_shift_32 = 16;
+           _rgb_g_shift_32 = 8;
+           _rgb_b_shift_32 = 0;
+           _rgb_a_shift_32 = 24;
+           break;
+        default:
+    #ifdef __AVX__
+           rgb_shifts = _mm_setr_epi8(0, 1, 2, 3, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
+    #endif
+           break;
+        }
+#else
+    #ifdef __AVX__
+        rgb_shifts = _mm_setr_epi8(0, 1, 2, 3, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
+    #endif
+#endif
         return 0;
     }
     return -1;
@@ -851,6 +905,9 @@ static void *system_thread_func(ALLEGRO_THREAD * self, void * arg){
 
 static bool start_system_thread(){
     system_thread = al_create_thread(system_thread_func, NULL);
+#if defined(DEBUGMODE) && defined(ALLEGRO_WINDOWS)
+	SetThreadDescription(*(HANDLE*)system_thread, L"Allegro 4 to 5 System Thread");
+#endif
     system_event_queue = al_create_event_queue();
     timer_mutex = al_create_mutex();
     keybuffer_mutex = al_create_mutex();
@@ -1335,18 +1392,6 @@ void draw_gouraud_sprite(struct BITMAP *bmp, struct BITMAP *sprite, int x, int y
     al_draw_bitmap(sprite->real, x, y, 0);
 }
 
-int makecol_depth(int depth, int r, int g, int b){
-    switch (depth){
-        case 8: return bestfit_color(current_palette, r>>2, g>>2, b>>2);
-        case 15: return (r >> 3) + ((g >> 3) << 5) + ((b >> 3) << 10);
-        case 16: return (r >> 3) + ((g >> 2) << 5) + ((b >> 3) << 11);
-        case 24: return r + (g << 8) + (b << 16);
-        case 32: return r + (g << 8) + (b << 16) + (255 << 24);
-        /* FIXME: handle 15, 16, 24, 32 */
-        default: return 0;
-    }
-}
-
 void set_clip_rect(BITMAP * bitmap, int x1, int y1, int x2, int y2){
     lazily_create_real_bitmap(bitmap, 0);
     al_set_target_bitmap(bitmap->real);
@@ -1379,7 +1424,15 @@ int makecol(int r, int g, int b){
 
 void clear_to_color(BITMAP *bitmap, int color){
     draw_into(bitmap);
-    al_clear_to_color(a5color(color, current_depth));
+    /* Color 0 (MASK_COLOR_8) is special in 8-bit mode. It is used with custom pointer in exmouse.
+     * We cannot move this logic to a5color as palette[0] is valid and is usually black.
+     * E.g. see exstars/erase_ship().
+     * For 32-bit mode, it is expected to do that in a5color.
+     * The Allegro GUI Un-uglification Project (AGUP) uses putpixel with MASK_COLOR_32. */
+    if (color || current_depth != 8)
+        al_clear_to_color(a5color(color, current_depth));
+    else
+        al_clear_to_color((ALLEGRO_COLOR) { 0 });
 }
 
 void acquire_screen(){
@@ -1475,6 +1528,30 @@ void persp_project_f(float x, float y, float z, float *xout, float *yout){
    float z1 = 1.0f / z;
    *xout = ((x * z1) * _persp_xscale_f) + _persp_xoffset_f;
    *yout = ((y * z1) * _persp_yscale_f) + _persp_yoffset_f;
+}
+
+void polygon(BITMAP *bmp, int vertices, AL_CONST int *points, int color) {
+    int limit = vertices << 1;
+    float *pts = al_malloc(limit * sizeof(float));
+    int i = 0;
+#ifdef __AVX__
+	/* process 4 vertices at a time but make sure we stay within array bounds */
+    limit -= 6;
+    for (; i < limit; i += 8) {
+        __m256i int_vec = _mm256_loadu_si256((const __m256i *)(points + i));
+        __m256 float_vec = _mm256_cvtepi32_ps(int_vec);
+        _mm256_storeu_ps(pts + i, float_vec);
+    }
+    /* then process the rest */
+    limit += 6;
+#endif
+	for (; i < limit; i++) {
+		pts[i] = points[i];
+	}
+	draw_into(bmp);
+    /* We don't check polygon orientation here. It is important in A5! */
+	al_draw_filled_polygon(pts, vertices, a5color(color, current_depth));
+    al_free(pts);
 }
 
 void polygon3d_f(BITMAP * bitmap, int type, BITMAP * texture, int vc, V3D_f * vtx[]){
@@ -1892,6 +1969,14 @@ int desktop_color_depth(void){
 // MINE
 int get_color_depth(){
     return current_depth;
+}
+
+int get_desktop_resolution(int *width, int *height) {
+    ALLEGRO_MONITOR_INFO info;
+    al_get_monitor_info(0, &info);
+    *width = info.x2 - info.x1;
+    *height = info.y2 - info.y1;
+    return 0;
 }
 
 void voice_start(int voice){

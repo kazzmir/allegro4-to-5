@@ -160,50 +160,36 @@ int bestfit_color(AL_CONST PALETTE pal, int r, int g, int b)
    return bestfit;
 }
 
-
-int makecol15(int r, int g, int b)
-{
-   return (((r >> 3) << _rgb_r_shift_15) |
-           ((g >> 3) << _rgb_g_shift_15) |
-           ((b >> 3) << _rgb_b_shift_15));
-}
-
-
-int makecol16(int r, int g, int b)
-{
-   return (((r >> 3) << _rgb_r_shift_16) |
-           ((g >> 2) << _rgb_g_shift_16) |
-           ((b >> 3) << _rgb_b_shift_16));
-}
-
-
-int makecol24(int r, int g, int b)
-{
-   return ((r << _rgb_r_shift_24) |
-           (g << _rgb_g_shift_24) |
-           (b << _rgb_b_shift_24));
-}
-
-
-int makecol32(int r, int g, int b)
-{
-   return ((r << _rgb_r_shift_32) |
-           (g << _rgb_g_shift_32) |
-           (b << _rgb_b_shift_32));
-}
-
-
-int makeacol32 (int r, int g, int b, int a)
-{
-   return ((r << _rgb_r_shift_32) |
-           (g << _rgb_g_shift_32) |
-           (b << _rgb_b_shift_32) |
-           (a << _rgb_a_shift_32));
-}
-
 int makecol8(int r, int g, int b)
 {
     return bestfit_color(current_palette, r>>2, g>>2, b>>2);
+}
+
+/* makecol_depth:
+ *  Converts R, G, and B values (ranging 0-255) to whatever pixel format
+ *  is required by the specified color depth.
+ */
+int makecol_depth(int color_depth, int r, int g, int b)
+{
+    switch (color_depth) {
+
+    case 8:
+        return makecol8(r, g, b);
+
+    case 15:
+        return makecol15(r, g, b);
+
+    case 16:
+        return makecol16(r, g, b);
+
+    case 24:
+        return makecol24(r, g, b);
+
+    case 32:
+        return makecol32(r, g, b);
+    }
+
+    return 0;
 }
 
 int makeacol_depth(int color_depth, int r, int g, int b, int a)
@@ -228,102 +214,6 @@ int makeacol_depth(int color_depth, int r, int g, int b, int a)
 
    return 0;
 }
-
-
-AL_INLINE(int, getr8, (int c),
-{
-   return _rgb_scale_6[(int)current_palette[c].r];
-})
-
-
-AL_INLINE(int, getg8, (int c),
-{
-   return _rgb_scale_6[(int)current_palette[c].g];
-})
-
-
-AL_INLINE(int, getb8, (int c),
-{
-   return _rgb_scale_6[(int)current_palette[c].b];
-})
-
-
-AL_INLINE(int, getr15, (int c),
-{
-   return _rgb_scale_5[(c >> _rgb_r_shift_15) & 0x1F];
-})
-
-
-AL_INLINE(int, getg15, (int c),
-{
-   return _rgb_scale_5[(c >> _rgb_g_shift_15) & 0x1F];
-})
-
-
-AL_INLINE(int, getb15, (int c),
-{
-   return _rgb_scale_5[(c >> _rgb_b_shift_15) & 0x1F];
-})
-
-
-AL_INLINE(int, getr16, (int c),
-{
-   return _rgb_scale_5[(c >> _rgb_r_shift_16) & 0x1F];
-})
-
-
-AL_INLINE(int, getg16, (int c),
-{
-   return _rgb_scale_6[(c >> _rgb_g_shift_16) & 0x3F];
-})
-
-
-AL_INLINE(int, getb16, (int c),
-{
-   return _rgb_scale_5[(c >> _rgb_b_shift_16) & 0x1F];
-})
-
-
-AL_INLINE(int, getr24, (int c),
-{
-   return ((c >> _rgb_r_shift_24) & 0xFF);
-})
-
-
-AL_INLINE(int, getg24, (int c),
-{
-   return ((c >> _rgb_g_shift_24) & 0xFF);
-})
-
-
-AL_INLINE(int, getb24, (int c),
-{
-   return ((c >> _rgb_b_shift_24) & 0xFF);
-})
-
-
-AL_INLINE(int, getr32, (int c),
-{
-   return ((c >> _rgb_r_shift_32) & 0xFF);
-})
-
-
-AL_INLINE(int, getg32, (int c),
-{
-   return ((c >> _rgb_g_shift_32) & 0xFF);
-})
-
-
-AL_INLINE(int, getb32, (int c),
-{
-   return ((c >> _rgb_b_shift_32) & 0xFF);
-})
-
-
-AL_INLINE(int, geta32, (int c),
-{
-   return ((c >> _rgb_a_shift_32) & 0xFF);
-})
 
 void set_color(int idx, AL_CONST RGB *p){
     /* TODO */

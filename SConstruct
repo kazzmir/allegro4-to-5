@@ -44,10 +44,12 @@ def defaultEnvironment():
         env.Append(LINKFLAGS=['-rpath', '/opt/homebrew/lib'])
     elif 'msvc' in env['TOOLS']:
         vcpkg_root = os.environ['VCPKG_ROOT'].replace('\\', '/')
-        env.Append(CCFLAGS=['/std:c11']) # if using _Thread_local
+        env.Append(CCFLAGS=['/std:c11', '/arch:AVX'])
         env.Append(CPPDEFINES=['ALLEGRO_NO_MAGIC_MAIN']) # to avoid forcing main() entry point for DLL
         env.Append(CPPPATH=[f'{vcpkg_root}/installed/x64-windows/include'])
         env.Append(LIBPATH=[f'{vcpkg_root}/installed/x64-windows/lib'])
+    else: # neither MSVC nor Apple
+        env.Append(CCFLAGS = ['-mavx'])
 
     if not build_shared:
         env.MergeFlags({'CPPDEFINES': 'ALLEGRO425_STATICLINK'})
