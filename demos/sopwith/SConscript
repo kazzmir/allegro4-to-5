@@ -8,4 +8,4 @@ if env['PLATFORM'] == 'win32':
     if 'msvc' in env['TOOLS']:
         # TODO: Add AL_PI to base.h and replace M_PI with it in demos/sopwith/sopwith.cpp
         defines.extend(['_USE_MATH_DEFINES'])
-env.Program('sopwith', source, CPPDEFINES=defines)
+Default( env.Program('sopwith', source, CPPDEFINES=defines) )

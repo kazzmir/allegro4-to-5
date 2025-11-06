@@ -1,0 +1,5 @@
+Import('env')
+
+test_poly = env.Program('test_poly', 'test_poly.c')
+env.Command('poly', test_poly, f'{test_poly[0].abspath} --check')
+Alias('check', 'poly')
