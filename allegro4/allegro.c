@@ -148,7 +148,7 @@ static int is_ok(int code){
 }
 
 /* returns an A5 color (ALLEGRO_COLOR) given an A4 packed int */
-static ALLEGRO_COLOR a5color(int a4color, int bit_depth){
+ALLEGRO_COLOR a5color(int a4color, int bit_depth){
     if (bit_depth == 8){
         RGB * rgb = &current_palette[a4color];
         return al_map_rgb(rgb->r * 4, rgb->g * 4, rgb->b * 4);
@@ -185,6 +185,10 @@ static int a4color(ALLEGRO_COLOR color, int bit_depth){
     unsigned char red, green, blue;
     al_unmap_rgb(color, &red, &green, &blue);
     return makecol_depth(bit_depth, red, green, blue);
+}
+
+ALLEGRO_DISPLAY* all_get_display(void){
+    return display;
 }
 
 int getr_depth(int color_depth, int c){
@@ -636,15 +640,8 @@ int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualh
            _rgb_a_shift_32 = 24;
            break;
         default:
-    #ifdef __AVX__
-           rgb_shifts = _mm_setr_epi8(0, 1, 2, 3, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
-    #endif
            break;
         }
-#else
-    #ifdef __AVX__
-        rgb_shifts = _mm_setr_epi8(0, 1, 2, 3, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
-    #endif
 #endif
         return 0;
     }
@@ -979,7 +976,11 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     for (index = 16; index < 256; index++){
         desktop_palette[index] = desktop_palette[index & 15];
     }
-    
+
+#ifdef __AVX__
+    rgb_shifts = _mm_setr_epi8(0, 1, 2, 3, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
+#endif
+
     check_blending();
 
     /* install shutdown handler */

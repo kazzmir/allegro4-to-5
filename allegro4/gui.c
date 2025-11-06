@@ -64,7 +64,7 @@ MENU *active_menu = NULL;
 
 
 static BITMAP *gui_screen = NULL;
-static BITMAP *gui_dbuf = NULL;
+BITMAP *gui_dbuf = NULL;
 static int gui_dbuf_dirty = FALSE;
 
 
@@ -79,7 +79,7 @@ static struct al_active_dialog_player *current_active_dialog_player = 0;
 
 
 /* forward declarations */
-static int update_dialog_held(DIALOG_PLAYER *player);
+int update_dialog_held(DIALOG_PLAYER *player);
 static int update_menu_held(MENU_PLAYER *player);
 static int shutdown_single_menu(MENU_PLAYER *, int *);
 
@@ -1358,7 +1358,7 @@ int update_dialog(DIALOG_PLAYER *player)
 
 
 
-static int update_dialog_held(DIALOG_PLAYER *player)
+int update_dialog_held(DIALOG_PLAYER *player)
 {
    int ret;
    hold_screen_refresh(TRUE);

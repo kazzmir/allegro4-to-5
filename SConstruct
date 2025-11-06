@@ -143,7 +143,9 @@ def allegroLibrary():
 def makeExample(source):
     env = allegro4Environment()
     env.VariantDir(f'{prefix}/examples', 'examples', duplicate = False)
-    return env.Program(f'{prefix}/examples/{source}')
+    ex = env.Program(f'{prefix}/examples/{source}')
+    Default(ex)
+    return ex
 
 def stars():
     return makeExample('exstars.c')
@@ -163,3 +165,6 @@ for example in examples:
     makeExample(name + ".c")
 
 demos()
+
+env = allegro4Environment()
+SConscript('tests/SConscript', variant_dir = f'{prefix}/tests', exports = ['env'], duplicate = False)

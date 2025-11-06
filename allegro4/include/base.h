@@ -78,6 +78,7 @@ extern int * allegro_errno;
 #define AL_PI        3.14159265358979323846
 
 #define ASSERT(x)
+#define TRACE(...)
 
 #define _AL_SINCOS(x, s, c)  do { (c) = cos(x); (s) = sin(x); } while (0)
 

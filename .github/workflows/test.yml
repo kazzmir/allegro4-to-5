@@ -29,13 +29,28 @@ jobs:
       with:
         path: ~/Library/Caches/Homebrew/downloads
         key: build-dep-macos
+    - name: 💾 Cache ImageMagick 7 on Ubuntu
+      id: imagemagick
+      if: runner.os == 'Linux'
+      uses: actions/cache@v4
+      with:
+        path: |
+          /usr/local/bin/magick
+          squashfs-root
+        key: magick-linux
     - name: 🍺 Install dependencies on MacOS
       if: runner.os == 'macOS'
-      run: env HOMEBREW_NO_AUTO_UPDATE=1 brew install allegro scons
+      run: env HOMEBREW_NO_AUTO_UPDATE=1 brew install allegro scons imagemagick
     - name: 🐧 Install dependencies on Linux
       if: runner.os == 'Linux'
+      run: sudo apt-get install -qq -y -o=Dpkg::Use-Pty=0 liballegro5-dev scons
+    - name: 🐧 Setup ImageMagick 7 on Linux
+      if: runner.os == 'Linux' && steps.imagemagick.outputs.cache-hit != 'true'
       run: |
-        sudo apt-get install -qq -y -o=Dpkg::Use-Pty=0 liballegro5-dev scons
+        wget -q --show-progress https://imagemagick.org/archive/binaries/magick
+        chmod +x magick
+        ./magick --appimage-extract
+        sudo ln -s $PWD/squashfs-root/usr/bin/magick /usr/local/bin/magick
     - name: Setup MSVC
       if: runner.os == 'Windows'
       uses: ilammy/msvc-dev-cmd@v1
@@ -47,8 +62,13 @@ jobs:
         echo "C:\msys64\ucrt64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     - name: 🪟 Install msys2 dependencies on Windows
       if: runner.os == 'Windows'
-      run: |
-        pacman --noconfirm -S mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-scons mingw-w64-ucrt-x86_64-allegro mingw-w64-ucrt-x86_64-pkgconf
+      run: >-
+        pacman --noconfirm -S
+        mingw-w64-ucrt-x86_64-gcc
+        mingw-w64-ucrt-x86_64-scons
+        mingw-w64-ucrt-x86_64-allegro
+        mingw-w64-ucrt-x86_64-pkgconf
+        mingw-w64-ucrt-x86_64-imagemagick
     - name: 🪟 Set up environment variables on Windows
       if: runner.os == 'Windows'
       run: |
@@ -56,10 +76,15 @@ jobs:
         echo "MSYSTEM=UCRT64" >> $GITHUB_ENV
     - name: 🪟 Install vcpkg dependencies on Windows
       if: runner.os == 'Windows'
-      run: vcpkg install allegro5
+      run: |
+        vcpkg install allegro5
+        choco install imagemagick
     - name: ⚒ Build static with Visual Studio on Windows
       if: runner.os == 'Windows'
       run: scons -j 1
+    - name: 🚀 Run tests for Visual Studio build
+      if: ${{ runner.os == 'Windows' && !cancelled() }}
+      run: scons check
     - name: ⚒ Build shared with Visual Studio on Windows
       if: ${{ runner.os == 'Windows' && !cancelled() }}
       run: |
@@ -68,6 +93,9 @@ jobs:
     - name: ⚒ Build static
       if: ${{ !cancelled() }}
       run: scons -j 1
+    - name: 🚀 Run tests
+      if: ${{ !cancelled() }}
+      run: scons check
     - name: ⚒ Build shared
       if: ${{ !cancelled() }}
       run: scons -j 1 build_shared=1
