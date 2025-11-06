@@ -640,15 +640,8 @@ int set_gfx_mode(int card, int width, int height, int virtualwidth, int virtualh
            _rgb_a_shift_32 = 24;
            break;
         default:
-    #ifdef __AVX__
-           rgb_shifts = _mm_setr_epi8(0, 1, 2, 3, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
-    #endif
            break;
         }
-#else
-    #ifdef __AVX__
-        rgb_shifts = _mm_setr_epi8(0, 1, 2, 3, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
-    #endif
 #endif
         return 0;
     }
@@ -983,7 +976,11 @@ int _install_allegro_version_check(int system_id, int *errno_ptr, int (*atexit_p
     for (index = 16; index < 256; index++){
         desktop_palette[index] = desktop_palette[index & 15];
     }
-    
+
+#ifdef __AVX__
+    rgb_shifts = _mm_setr_epi8(0, 1, 2, 3, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
+#endif
+
     check_blending();
 
     /* install shutdown handler */
